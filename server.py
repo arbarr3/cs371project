@@ -2,6 +2,7 @@ from calendar import c
 import os
 import socket
 import threading
+import pickle
 
 # Define server's filepath location
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -67,6 +68,10 @@ class ClientThread(threading.Thread):
                     send_data += "CREATE new file on the server.\n" 
                     send_data += "LOGOUT from the server.\n"
                     self.sock.send(send_data.encode(FORMAT))
+                
+                elif cmd == "PICKLE":
+                    message = pickle.loads(bytes(arg, 'utf-8'))
+                    print(message)
         
         print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
         self.sock.close()
