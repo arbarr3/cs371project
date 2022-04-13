@@ -6,11 +6,11 @@
 
 import os
 import socket
-
+import pickle
 
 
 IP = "localhost"
-IP = "10.113.32.57"
+#IP = "10.113.32.57"
 PORT = 4450
 ADDR = (IP,PORT)
 SIZE = 1024 ## byte .. buffer size
@@ -29,6 +29,18 @@ def main():
         elif cmd == "DISCONNECTED":
             print(f"{msg}")
             break
+        elif cmd == "INFO":
+            info = b''
+            receiving = True
+            while(receiving):
+                buffer = client.recv(16)
+                bufferLen = int(buffer[:SIZE])
+                info += buffer
+
+                if(len(info)-SIZE == bufferLen):
+                    print(pickle.loads(info[SIZE:]))
+                    receiving = False
+            break
         
         data = input("> ") 
         cmd = data.strip("\n")
@@ -36,6 +48,12 @@ def main():
         #cmd = data[0]
 
         if cmd == "TASK":
+            client.send(cmd.encode(FORMAT))
+        elif cmd == "INFO":
+            client.send(cmd.encode(FORMAT))
+        elif "DELFILE@" in cmd:
+            client.send(cmd.encode(FORMAT))
+        elif "DELDIR@" in cmd:
             client.send(cmd.encode(FORMAT))
         elif "MKDIR@" in cmd:
             client.send(cmd.encode(FORMAT))
