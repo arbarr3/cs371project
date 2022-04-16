@@ -30,3 +30,10 @@ for i in range (1, len(data)):
 
 print(args)
 print(args.pop())
+
+exclude = set(['.git'])
+for root, dirs, files in os.walk('.', topdown=True):
+    dirs[:] = [d for d in dirs if d not in exclude]
+    print(root)
+    print(dirs)
+    print(files)
