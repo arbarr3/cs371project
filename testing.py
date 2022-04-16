@@ -31,9 +31,31 @@ for i in range (1, len(data)):
 print(args)
 print(args.pop())
 
+dirList = []
 exclude = set(['.git'])
 for root, dirs, files in os.walk('.', topdown=True):
     dirs[:] = [d for d in dirs if d not in exclude]
-    print(root)
+    
+    contains = []
+
+    paths = root.split("\\")
+    subFolder = paths[len(paths)-1]
+    print(subFolder)
     print(dirs)
     print(files)
+    
+    for d in dirs:
+        subDir = {d}
+        contains.append(subDir)
+
+    for f in files:
+        contains.append(f)
+
+    dict = {root: contains}
+
+    if subFolder == ".":
+        dirList.append(dict)
+    else:
+        print("I need to traverse the dirList and make contains the values where the key is subFolder")
+
+print(dirList)
