@@ -69,27 +69,40 @@ class ClientThread(threading.Thread):
         threading.Thread.__init__(self)         # Execute async run(self) method
         print(" > New client thread started on " + ip + ":" + str(port))
     
+
+    #--------------------------------------------------------------------------
+    # Threading run() method
+    # Purpose:  Handles the intents of a connected client by mapping requests to server responses
+    # Pre:      Initialized ClientThread, invoked on new client connection to server
+    # Exit:     Terminates server connection to client by closing the socket
+    #--------------------------------------------------------------------------
     def run(self):
-        # Use the sock param to as the connection to send/receive data between this thread (the server) and the client
-        userConnected = True # Provided the user remains logged in, maintain functionality of thread
-        userAuth = False 
-        self.sock.send("LOGIN@".encode(FORMAT))          # Promp the client for login credentials
+        userConnected = True                    # Maintains functionality of the running thread, when set to false connection is terminating and socket closes
+        userAuth = False                        # Prevents execution of main while loop in this run method until user credentials are authenticated
+        self.sock.send("LOGIN@".encode(FORMAT)) # Prompt the client for login credentials upon connection
 
-        while (userConnected):
-            credentials = self.sock.recv(SIZE).decode(FORMAT)
-            user, password = credentials.split("@")
+        # Loop continues provided client has not disconnected
+        # Server recognizes disconnects via the LOGOUT command
+        while (userConnected):                  
+            credentials = self.sock.recv(SIZE).decode(FORMAT)   # In response to LOGIN@ request, client transmits credentials to authenticate
+            user, password = credentials.split("@")             # Split credentials from "username@password" into seperate (str) variables
 
+            # Iterate through the _users_ dict to determine if supplies credentials match a user:password pair
             for key, value in _users_.items():
                 if key == user and value == password:
-                    userAuth = True
-                    self.sock.send("ACCEPT".encode(FORMAT))
+                    userAuth = True                             # Enables entry into main while loop of run method for ClientHandler
+                    self.sock.send("ACCEPT".encode(FORMAT))     # Send response to client
                     print(" > " + user + " has successfully logged in")
-                    break 
+                    break                                       
 
+            # If credential pair was not found in _users_ dict, a response needs to be sent to client
+            # Because userAuth is false, the main while loop will not be entered and server will wait for new credentials
             if(not userAuth):
                 self.sock.send("REJECT".encode(FORMAT))
                 print(" > " + user + " failed login attempt.")  
 
+            # Once user credentials are authenticated, the server begins to accept client requests
+            # This loop will run until the LOGOUT command is transmitted
             while(userAuth):
                 self.sock.send("OK@Welcome to the server".encode(FORMAT))
                 send_data = ""
