@@ -21,3 +21,12 @@ userTest = "aberra2"
 for key, value in data.items():
     if key == userTest and value == passwordTest:
         print("User " + key + " with password " + value + " was found!")
+
+
+data = ["MKDIR", "rscris2", "weeee"]
+args =[]
+for i in range (1, len(data)):
+    args.append(data[i])
+
+print(args)
+print(args.pop())

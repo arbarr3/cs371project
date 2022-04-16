@@ -23,13 +23,16 @@ def main():
     client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     client.connect(ADDR)
     while True:  ### multiple communications
+        #====================== Client Recieve Logic ==========================
+        #----------------------------------------------------------------------
+        #----------------------------------------------------------------------
         data = client.recv(SIZE).decode(FORMAT)
         cmd, msg = data.split("@")
         if cmd == "OK":
             print(f"{msg}")
         elif cmd == "LOGIN":
-            auth = True
-            while(auth):
+            auth = False
+            while(not auth):
                 user = input("User: ")
                 user = user.strip("\n")
                 password = input("Password: ")
@@ -39,24 +42,25 @@ def main():
 
                 response = client.recv(SIZE).decode(FORMAT)
                 if response == "ACCEPT":
-                    auth = False
+                    auth = True
                     data = client.recv(SIZE).decode(FORMAT)
                     cmd, msg = data.split("@")
                     if cmd == "OK":
                         print(f"{msg}")
                 else:
                     print("Invalid, try again")
-
         elif cmd == "DISCONNECTED":
             print(f"{msg}")
             break
                 
+
+        #====================== Client Transmit Logic ==========================
+        #----------------------------------------------------------------------
+        #----------------------------------------------------------------------
         data = input("> ") 
         cmd = data.strip("\n")
 
         if cmd == "TASK":
-            client.send(cmd.encode(FORMAT))
-        elif cmd == "INFO":
             client.send(cmd.encode(FORMAT))
         elif "UPLOAD@" in cmd:
             path = "C:/Users/crisp/Downloads/hw4.pdf"
@@ -74,9 +78,6 @@ def main():
 
                     client.sendfile(bytes_read)
                     progressBar.update(len(bytes_read))
-
-
-
         elif "DELFILE@" in cmd:
             client.send(cmd.encode(FORMAT))
         elif "DELDIR@" in cmd:

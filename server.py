@@ -12,7 +12,7 @@
 from calendar import c
 import os               # Used for filepath referencing
 import tqdm             # Used to display file transfer progess within terminal
-import shutil
+import shutil           # Used for deleting directories
 import socket           # Used to implement python socket networking functionality
 import threading        # Used to grant each client connection a seperate thread
 import pickle
@@ -81,92 +81,130 @@ class ClientThread(threading.Thread):
         userAuth = False                        # Prevents execution of main while loop in this run method until user credentials are authenticated
         self.sock.send("LOGIN@".encode(FORMAT)) # Prompt the client for login credentials upon connection
 
+        #===================================== LOGIN Logic ===================================================
+        #-----------------------------------------------------------------------------------------------------
+        #
+        #            Server                                              Client
+        #   1   Sends "LOGIN@"                      --->        <Enters authentication loop>
+        #   2   <Checks credentials for auth>       <---         Sends "<users>@<password>"
+        #   3   Auth Success: sends "ACCEPT"        --->        <Waits for welcome message, exits auth loop>
+        #   3   Auth Fail:    sends "REJECT"        --->        <Prints error, reprompts for credentials>
+        #                                                       <Does NOT wait for second message>
+        #   4   Auth Success: sends "OK@Welcome"    --->        <Sends welcome message using to client>
+        #
+        #----------------------------------------------------------------------------------------------------
+
         # Loop continues provided client has not disconnected
         # Server recognizes disconnects via the LOGOUT command
-        while (userConnected):                  
+        while (userConnected):                
             credentials = self.sock.recv(SIZE).decode(FORMAT)   # In response to LOGIN@ request, client transmits credentials to authenticate
             user, password = credentials.split("@")             # Split credentials from "username@password" into seperate (str) variables
 
             # Iterate through the _users_ dict to determine if supplies credentials match a user:password pair
             for key, value in _users_.items():
                 if key == user and value == password:
-                    userAuth = True                             # Enables entry into main while loop of run method for ClientHandler
-                    self.sock.send("ACCEPT".encode(FORMAT))     # Send response to client
+                    userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
+                    self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful
+                    self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
                     print(" > " + user + " has successfully logged in")
                     break                                       
 
             # If credential pair was not found in _users_ dict, a response needs to be sent to client
             # Because userAuth is false, the main while loop will not be entered and server will wait for new credentials
             if(not userAuth):
-                self.sock.send("REJECT".encode(FORMAT))
+                self.sock.send("REJECT".encode(FORMAT))                         # Sending anything other than ACCEPT will cause client to loop back into resending credentials
                 print(" > " + user + " failed login attempt.")  
 
             # Once user credentials are authenticated, the server begins to accept client requests
             # This loop will run until the LOGOUT command is transmitted
             while(userAuth):
-                self.sock.send("OK@Welcome to the server".encode(FORMAT))
-                send_data = ""
-                data = self.sock.recv(SIZE).decode(FORMAT).split("@")
-                cmd = data[0]
+                   
+                #========================================= Main Command Flow Control #==============================================
+                #-------------------------------------------------------------------------------------------------------------------
+                #
+                #                        Server                                                 Client
+                #      1      <Seperates command and args>              <---   Sends "<command>@<arg>" from client intent
+                #      2      <Executes command control block>
+                #      3      Sends "OK@<response>" upon completion     --->   <Displays message to client. Prompts for new command>
+                #
+                #--------------------------------------------------------------------------------------------------------------------
+                
+                # Receive client intent in "<cmd>@<arg1>@<arg2>@....<argN>" format
+                data = self.sock.recv(SIZE).decode(FORMAT).split("@")   
+                cmd = data[0]                   # Used to enter server flow control blocks                                           
+                args = []                       # Used withing flow control blocks to perform command
+                for i in range (1, len(data)):  # Capture all sent arguments
+                    args.append(data[i])        # Populate list with command's arguments
 
-                # If an argument is passed with the command, capture that as arg
-                if(len(data) > 1):
-                    arg = data[1]
 
+                #-----------------------------------------------------------------------------
+                #   Command:    LOGOUT
+                #   Args   :    []
+                #   Purpose:    Terminates both while loops causing the closing of the socket
+                #   Status :    100% TODO Remove me
+                #-----------------------------------------------------------------------------
                 if cmd == "LOGOUT":
                     userConnected = False
                     break
                 
-                # Client UPLOAD file to server
-                    # @cmd: UPLOAD@filename@filesize
+                #-----------------------------------------------------------------------------
+                #   Command:    UPLOAD
+                #   Args   :    [filename, filesize]
+                #   Purpose:    Server receives the specified file to the current working directory of the socket
+                #   Status :    TODO
+                #-----------------------------------------------------------------------------
                 elif cmd == "UPLOAD":
-                    filename = arg
-                    filesize = int(data[2])
-                    progressBar = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+                    filesize = int(args.pop())
+                    filename = args.pop()
 
-                    with open(filename, "wb") as f:
-                        while True:
-                            # Read SIZE (1024) bytes from socket
-                            bytes_read = self.sock.recv(SIZE)
-
-                            if not bytes_read: # Nothing is recieved or transmission is over
-                                break
-
-                            f.write(bytes_read)
-                            progressBar.update(len(bytes_read))
-
-                    send_data += "OK@"
-                    send_data += "I think I sent " + filename + " of size " + filesize
+                    send_data = "OK@"
+                    send_data += "I wish I could send files..."
                     self.sock.send(send_data.encode(FORMAT))
 
+                #-----------------------------------------------------------------------------
+                #   Command:    DOWNLOAD
+                #   Args   :    [filename]
+                #   Purpose:    Server sends the specified file to the current working directory of the client
+                #   Status :    TODO
+                #-----------------------------------------------------------------------------
 
-                #DOWNLOAD
-                #elif cmd == "DOWNLOAD":
-
-                    
-
-
-                # Delete Single File
-                    # @cmd: DELFILE@file_name
+                #-----------------------------------------------------------------------------
+                #   Command:    DELFILE
+                #   Args   :    [filename]
+                #   Purpose:    Delete the file specified at the current location, provided the file exists
+                #   Status :    33% TODO Needs validation / Edge case considerations for missing files
+                #               TODO Needs to use socket's current working directory, not _location_
+                #-----------------------------------------------------------------------------
                 elif cmd == "DELFILE":
-                    file = arg
+                    filename = args.pop()
                     if os.path.exists(_location_):
-                        os.remove(file)
-                        print(" > File " + file + " has been deleted.")
+                        os.remove(filename)
+                        print(" > File " + filename + " has been deleted.")
                         self.sock.send("OK@File has been deleted".encode(FORMAT))
                 
-                # Delete Directory (and all its' contents!!!)
-                #DELDIR@directory_name
+                #-----------------------------------------------------------------------------
+                #   Command:    DELDIR
+                #   Args   :    [directory_name]
+                #   Purpose:    Deletes the supplied directory and all it contains
+                #   Status :    50% TODO Needs to evaluate based on socket's current working directory, not _location_
+                #-----------------------------------------------------------------------------
                 elif cmd == "DELDIR":
-                    dir = arg
-                    if os.path.exists(_location_):
+                    dir = args.pop()
+                    dirPath = os.path.join(_location_, dir)
+                    if os.path.exists(dirPath):
                         shutil.rmtree(dir)
                         print(" > Directory " + dir + " has been deleted.")
                         self.sock.send("OK@Directory has been deleted".encode(FORMAT))   
 
-                #DIR CREATE 
+                #-----------------------------------------------------------------------------
+                #   Command:    MKDIR
+                #   Args   :    [directory_name]
+                #   Purpose:    Creates a new directory at the current working directory
+                #   Status :    25% TODO Needs to evaluate based on socket's current working directory, not _location_\
+                #               TODO Needs to handle edge case; duplicate directory names
+                #-----------------------------------------------------------------------------
                 elif cmd == "MKDIR":
-                    dir = arg
+                    dir = args.pop()
                     # Determine if arg is a key in the dirTree at the current dir
                     # if arg is a key in thisDict
                         # self.sock.send("NK@Error. Directory with that filename exists. Please retry.").encode(FORMAT))
@@ -182,32 +220,28 @@ class ClientThread(threading.Thread):
                 #TESTING
                 #TASK
                 elif cmd == "TASK":
-                    send_data += "OK@"
+                    send_data = "OK@"
                     send_data += "CREATE new file on the server.\n" 
                     send_data += "LOGOUT from the server."
                     self.sock.send(send_data.encode(FORMAT))
-                
-                #TESTING
-                #INFO send Pickled Server Directory as Python Dict
-                elif cmd == "INFO":
-                    send_data += "INFO@"
-                    self.sock.send(send_data.encode(FORMAT))
 
-                    info = pickle.dumps(_dirTree_)
-                    info = bytes(f"{len(info):<{SIZE}}", 'utf-8') + info
-                    self.sock.send(info)
-
-        print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
+        # Executes once userConnected is false
+        # Close the socket and end the running loop 
         self.sock.close()
+        print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
+
+
+#def populateDirectory():
 
 # Server Startup    
-server = socket.socket(socket.AF_INET,socket.SOCK_STREAM) # used IPV4 and TCP connection
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Prevent bind() exceptions
-server.bind((IP, PORT)) # bind the address
-threads = []
+server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)       # Using IPV4 and TCP connection
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)    # Prevent bind() exceptions
+server.bind((IP, PORT))                                         # Bind the address to the server
+threads = []                                                    # TODO am I needed? Test me!
 print("Starting the server")
 print(f"server is listening on {IP}: {PORT}")
 print("Waiting for incoming connections...")
+
 
 userPath = os.path.join(_location_, "users.json")
 with open(userPath, "r") as read_file:
@@ -219,4 +253,4 @@ while True:
     print('Got connection from ', (ip,port))
     newthread = ClientThread(ip,port,conn)
     newthread.start()
-    threads.append(newthread)
+    threads.append(newthread)                                   # TODO am I needed? Test me!
