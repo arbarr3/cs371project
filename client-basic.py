@@ -11,7 +11,7 @@ import pickle
 
 
 IP = "localhost"
-IP = "10.113.32.57"
+#IP = "10.113.32.57"
 PORT = 4450
 ADDR = (IP,PORT)
 SIZE = 1024 ## byte .. buffer size
@@ -27,6 +27,26 @@ def main():
         cmd, msg = data.split("@")
         if cmd == "OK":
             print(f"{msg}")
+        elif cmd == "LOGIN":
+            auth = True
+            while(auth):
+                user = input("User: ")
+                user = user.strip("\n")
+                password = input("Password: ")
+                password = password.strip("\n")
+                attempt = user + "@" + password
+                client.send(attempt.encode(FORMAT))
+
+                response = client.recv(SIZE).decode(FORMAT)
+                if response == "ACCEPT":
+                    auth = False
+                    data = client.recv(SIZE).decode(FORMAT)
+                    cmd, msg = data.split("@")
+                    if cmd == "OK":
+                        print(f"{msg}")
+                else:
+                    print("Invalid, try again")
+
         elif cmd == "DISCONNECTED":
             print(f"{msg}")
             break

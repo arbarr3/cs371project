@@ -1,16 +1,33 @@
+#==============================================================================
+#
+#   Authors:    Alexander Barrera & Robert Crispen
+#   Date:       24 April 2022
+#   Org:        University of Kentucky
+#   Class:      CS371 - Computer Networking
+#
+#   Purpose:    This file runs a basic socket server
+#               
+#==============================================================================
+
 from calendar import c
-import os
-import tqdm
+import os               # Used for filepath referencing
+import tqdm             # Used to display file transfer progess within terminal
 import shutil
-import socket
-import threading
+import socket           # Used to implement python socket networking functionality
+import threading        # Used to grant each client connection a seperate thread
 import pickle
+import json             # Used to access the user plain text file for authentication
 
-# Define server's filepath location
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-# Global variable to store the server directory information
-__dirTree__ = [
+#============================= Private Variables ===============================
+# 
+#   _location_ :  (str)   :   Defines the server root as the real filepath of the current working directory
+#   _users_    :  (Dict)  :   Plain text dictory of user:password strings
+#   _dirTree_  :  (List)  :   Lists the files and directories of the entire server  
+#
+#------------------------------------------------------------------------------
+_location_ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+_users_ = os.path.join(_location_, "users.json")
+_dirTree_ = [ 
     {
         "dir1": [
             {
@@ -28,40 +45,54 @@ __dirTree__ = [
     "file3.jpg"
 ]
 
-# Initialize global variables to define local server
+#============================= Global Variables ===============================
+# 
+#   IP      :  (str)     :   IP address the server is run on
+#   PORT    :  (int)     :   Port the server is accessed through
+#   SIZE    :  (int)     :   Buffer size (in bytes) of the server  
+#   FORMAT  :  (str)     :   Encoding format of the server
+#
+#------------------------------------------------------------------------------
 IP = "localhost"
-IP = "10.113.32.57"
+#IP = "10.113.32.57"
 PORT = 4450
-ADDR = (IP,PORT)
 SIZE = 1024
 FORMAT = "utf-8"
-SERVER_PATH = "server"
 
-# Async Client Handler via Threading
+# Async Client Handler
 class ClientThread(threading.Thread):   
-
-    # On each client initialization create a new thread
+    # Constructor
     def __init__(self, ip, port, sock):
-        threading.Thread.__init__(self)
-        self.ip = ip
-        self.port = port
-        self.sock = sock
+        self.ip = ip                            # IP address of the socket server
+        self.port = port                        # Port of the socket server
+        self.sock = sock                        # Server socket
+        threading.Thread.__init__(self)         # Execute async run(self) method
         print(" > New client thread started on " + ip + ":" + str(port))
     
     def run(self):
         # Use the sock param to as the connection to send/receive data between this thread (the server) and the client
-        self.sock.send("OK@Welcome to the server".encode(FORMAT))
-
+        #self.sock.send("OK@Welcome to the server".encode(FORMAT))
         userConnected = True # Provided the user remains logged in, maintain functionality of thread
-        userAuth = True #TODO change to false when authentication is added
+        userAuth = False #TODO change to false when authentication is added
+        self.sock.send("LOGIN@".encode(FORMAT))          # Promp the client for login credentials
 
         while (userConnected):
-            # Send ACK that connection is established
-            # Authenticate user TODO fix isUserAuthed above
-                # Auth successfull, allow user intents
-                # Auth unsuccessfull, reprompt suer
-            
+            credentials = self.sock.recv(SIZE).decode(FORMAT)
+            user, password = credentials.split("@")
+
+            for key, value in _users_.items():
+                if key == user and value == password:
+                    userAuth = True
+                    self.sock.send("ACCEPT".encode(FORMAT))
+                    print(" > " + user + " has successfully logged in")
+                    break 
+
+            if(userAuth == False):
+                self.sock.send("REJECT".encode(FORMAT))
+                print(" > " + user + " failed login attempt.")  
+
             while(userAuth):
+                self.sock.send("OK@Welcome to the server".encode(FORMAT))
                 send_data = ""
                 data = self.sock.recv(SIZE).decode(FORMAT).split("@")
                 cmd = data[0]
@@ -107,7 +138,7 @@ class ClientThread(threading.Thread):
                     # @cmd: DELFILE@file_name
                 elif cmd == "DELFILE":
                     file = arg
-                    if os.path.exists(__location__):
+                    if os.path.exists(_location_):
                         os.remove(file)
                         print(" > File " + file + " has been deleted.")
                         self.sock.send("OK@File has been deleted".encode(FORMAT))
@@ -116,7 +147,7 @@ class ClientThread(threading.Thread):
                 #DELDIR@directory_name
                 elif cmd == "DELDIR":
                     dir = arg
-                    if os.path.exists(__location__):
+                    if os.path.exists(_location_):
                         shutil.rmtree(dir)
                         print(" > Directory " + dir + " has been deleted.")
                         self.sock.send("OK@Directory has been deleted".encode(FORMAT))   
@@ -128,7 +159,7 @@ class ClientThread(threading.Thread):
                     # if arg is a key in thisDict
                         # self.sock.send("NK@Error. Directory with that filename exists. Please retry.").encode(FORMAT))
                     # else (indent and do the rest)
-                    path = os.path.join(__location__, dir)
+                    path = os.path.join(_location_, dir)
                     os.mkdir(path)
                     print(" > New directory " + dir + " has been created")
                     self.sock.send("OK@New directory has been created".encode(FORMAT))
@@ -150,23 +181,25 @@ class ClientThread(threading.Thread):
                     send_data += "INFO@"
                     self.sock.send(send_data.encode(FORMAT))
 
-                    info = pickle.dumps(__dirTree__)
+                    info = pickle.dumps(_dirTree_)
                     info = bytes(f"{len(info):<{SIZE}}", 'utf-8') + info
                     self.sock.send(info)
 
-
-        
         print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
         self.sock.close()
 
 # Server Startup    
 server = socket.socket(socket.AF_INET,socket.SOCK_STREAM) # used IPV4 and TCP connection
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Prevent bind() exceptions
-server.bind(ADDR) # bind the address
+server.bind((IP, PORT)) # bind the address
 threads = []
 print("Starting the server")
 print(f"server is listening on {IP}: {PORT}")
 print("Waiting for incoming connections...")
+
+userPath = os.path.join(_location_, "users.json")
+with open(userPath, "r") as read_file:
+    _users_ = json.load(read_file)
     
 while True:
     server.listen() # start listening with default size backlog
