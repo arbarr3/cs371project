@@ -1,5 +1,6 @@
 from calendar import c
 import os
+import tqdm
 import shutil
 import socket
 import threading
@@ -29,7 +30,7 @@ __dirTree__ = [
 
 # Initialize global variables to define local server
 IP = "localhost"
-#IP = "10.113.32.57"
+IP = "10.113.32.57"
 PORT = 4450
 ADDR = (IP,PORT)
 SIZE = 1024
@@ -37,7 +38,7 @@ FORMAT = "utf-8"
 SERVER_PATH = "server"
 
 # Async Client Handler via Threading
-class ClientThread(threading.Thread):
+class ClientThread(threading.Thread):   
 
     # On each client initialization create a new thread
     def __init__(self, ip, port, sock):
@@ -64,6 +65,8 @@ class ClientThread(threading.Thread):
                 send_data = ""
                 data = self.sock.recv(SIZE).decode(FORMAT).split("@")
                 cmd = data[0]
+
+                # If an argument is passed with the command, capture that as arg
                 if(len(data) > 1):
                     arg = data[1]
 
@@ -71,11 +74,37 @@ class ClientThread(threading.Thread):
                     userConnected = False
                     break
                 
-                #UPLOAD
+                # Client UPLOAD file to server
+                    # @cmd: UPLOAD@filename@filesize
+                elif cmd == "UPLOAD":
+                    filename = arg
+                    filesize = int(data[2])
+                    progressBar = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+
+                    with open(filename, "wb") as f:
+                        while True:
+                            # Read SIZE (1024) bytes from socket
+                            bytes_read = self.sock.recv(SIZE)
+
+                            if not bytes_read: # Nothing is recieved or transmission is over
+                                break
+
+                            f.write(bytes_read)
+                            progressBar.update(len(bytes_read))
+
+                    send_data += "OK@"
+                    send_data += "I think I sent " + filename + " of size " + filesize
+                    self.sock.send(send_data.encode(FORMAT))
+
+
                 #DOWNLOAD
+                #elif cmd == "DOWNLOAD":
+
+                    
+
 
                 # Delete Single File
-                #DELFILE@file_name
+                    # @cmd: DELFILE@file_name
                 elif cmd == "DELFILE":
                     file = arg
                     if os.path.exists(__location__):
@@ -103,6 +132,7 @@ class ClientThread(threading.Thread):
                     os.mkdir(path)
                     print(" > New directory " + dir + " has been created")
                     self.sock.send("OK@New directory has been created".encode(FORMAT))
+                
                 #DIR LIST (ls) TODO
                 #DIR CHANGE (cd) TODO
 

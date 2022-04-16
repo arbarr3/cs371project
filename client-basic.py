@@ -5,12 +5,13 @@
 # Author : Ayesha S. Dina
 
 import os
+import tqdm
 import socket
 import pickle
 
 
 IP = "localhost"
-#IP = "10.113.32.57"
+IP = "10.113.32.57"
 PORT = 4450
 ADDR = (IP,PORT)
 SIZE = 1024 ## byte .. buffer size
@@ -29,35 +30,39 @@ def main():
         elif cmd == "DISCONNECTED":
             print(f"{msg}")
             break
-        elif cmd == "INFO":
-            info = b''
-            receiving = True
-            while(receiving):
-                buffer = client.recv(16)
-                bufferLen = int(buffer[:SIZE])
-                info += buffer
-
-                if(len(info)-SIZE == bufferLen):
-                    print(pickle.loads(info[SIZE:]))
-                    receiving = False
-            break
-        
+                
         data = input("> ") 
         cmd = data.strip("\n")
-        
-        #cmd = data[0]
 
         if cmd == "TASK":
             client.send(cmd.encode(FORMAT))
         elif cmd == "INFO":
             client.send(cmd.encode(FORMAT))
+        elif "UPLOAD@" in cmd:
+            path = "C:/Users/crisp/Downloads/hw4.pdf"
+            filename = "hw4.pdf"
+            filesize = os.path.getsize(path)
+            cmd += "client.py@" + str(filesize)
+            client.send(cmd.encode(FORMAT))
+            progressBar = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+
+            with open(path, "rb") as f:
+                while True:
+                    bytes_read = f.read(SIZE)
+                    if not bytes_read:
+                        break
+
+                    client.sendfile(bytes_read)
+                    progressBar.update(len(bytes_read))
+
+
+
         elif "DELFILE@" in cmd:
             client.send(cmd.encode(FORMAT))
         elif "DELDIR@" in cmd:
             client.send(cmd.encode(FORMAT))
         elif "MKDIR@" in cmd:
             client.send(cmd.encode(FORMAT))
-
         elif cmd == "LOGOUT":
             client.send(cmd.encode(FORMAT))
             break
