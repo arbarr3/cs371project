@@ -71,9 +71,8 @@ class ClientThread(threading.Thread):
     
     def run(self):
         # Use the sock param to as the connection to send/receive data between this thread (the server) and the client
-        #self.sock.send("OK@Welcome to the server".encode(FORMAT))
         userConnected = True # Provided the user remains logged in, maintain functionality of thread
-        userAuth = False #TODO change to false when authentication is added
+        userAuth = False 
         self.sock.send("LOGIN@".encode(FORMAT))          # Promp the client for login credentials
 
         while (userConnected):
@@ -87,7 +86,7 @@ class ClientThread(threading.Thread):
                     print(" > " + user + " has successfully logged in")
                     break 
 
-            if(userAuth == False):
+            if(not userAuth):
                 self.sock.send("REJECT".encode(FORMAT))
                 print(" > " + user + " failed login attempt.")  
 
