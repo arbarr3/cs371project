@@ -242,7 +242,7 @@ print("Starting the server")
 print(f"server is listening on {IP}: {PORT}")
 print("Waiting for incoming connections...")
 
-
+# Load users JSON into _users_
 userPath = os.path.join(_location_, "users.json")
 with open(userPath, "r") as read_file:
     _users_ = json.load(read_file)
