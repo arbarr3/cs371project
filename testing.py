@@ -39,7 +39,7 @@ for root, dirs, files in os.walk('.', topdown=True):
     contains = []
 
     paths = root.split("\\")
-    subFolder = paths[len(paths)-1]
+    subFolder = paths[len(paths)-1] # This logic needs to be used to determine how deep to iterate through looking for subfolders
     print(subFolder)
     print(dirs)
     print(files)
