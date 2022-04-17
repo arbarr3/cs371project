@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 list = {
     "rscris2": "foo",
@@ -59,3 +60,11 @@ for root, dirs, files in os.walk('.', topdown=True):
         print("I need to traverse the dirList and make contains the values where the key is subFolder")
 
 print(dirList)
+
+dirContent = {"dirs": [x for x in os.listdir(os.getcwd()) if not os.path.isfile(x)], "files": [x for x in os.listdir(os.getcwd()) if os.path.isfile(x)]}
+
+print(dirContent)
+
+p = Path(".")
+for c in p.iterdir():
+    print(c)
