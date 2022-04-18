@@ -59,7 +59,6 @@ _dirTree_ = [
 #
 #------------------------------------------------------------------------------
 IP = "localhost"
-IP = "169.254.40.234"
 #IP = "10.113.32.57"
 PORT = 4450
 SIZE = 1024
@@ -129,8 +128,6 @@ class ClientThread(threading.Thread):
             # Once user credentials are authenticated, the server begins to accept client requests
             # This loop will run until the LOGOUT command is transmitted
             while(userAuth):
-                self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
-
                 #========================================= Main Command Flow Control #==============================================
                 #-------------------------------------------------------------------------------------------------------------------
                 #

@@ -4,6 +4,7 @@ from tkinter import SUNKEN, ttk
 from tkinter import StringVar
 import socket
 import pickle
+import time
 
 class GUIWindow:
     SIZE = 1024
@@ -18,25 +19,29 @@ class GUIWindow:
         self.client = clientSocket
         self.folderImage = tk.PhotoImage(file="./images/folder.png")
         self.fileImage = tk.PhotoImage(file="./images/file.png")
+        self.dirButtons = {}
+        self.dirLabels = {}
+        self.fileButtons = {}
+        self.fileLabels = {}
         self.updateDirectory()
     
     def updateDirectory(self):
         self.client.send("GETDIR".encode(self.FORMAT))
         data = self.client.recv(self.SIZE)
         dirsAndFiles = pickle.loads(data)
-        dirButtons = {}
-        dirLabels = {}
-        fileButtons = {}
-        fileLabels = {}
+
+        for i in [*self.dirButtons, *self.dirLabels, *self.fileButtons, *self.fileLabels]:
+            i.destroy()
+
         c = 0
         r = 0
         print(f"received: {dirsAndFiles}")
         for dir in dirsAndFiles["dirs"]:
-            dirButtons[dir] = tk.Button(self.window, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
-            dirButtons[dir].grid(column=c, row=r, padx=5, pady=5)
+            self.dirButtons[dir] = tk.Button(self.window, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
+            self.dirButtons[dir].grid(column=c, row=r, padx=5, pady=5)
             r += 1
-            dirLabels[dir] = tk.Label(self.window, text=dir)
-            dirLabels[dir].grid(column=c, row=r, padx=5)
+            self.dirLabels[dir] = tk.Label(self.window, text=dir)
+            self.dirLabels[dir].grid(column=c, row=r, padx=5)
             r -= 1
 
             c += 1
@@ -44,11 +49,11 @@ class GUIWindow:
                 c = 0
                 r += 1
         for file in dirsAndFiles["files"]:
-            fileButtons[file] = tk.Button(self.window, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
-            fileButtons[file].grid(column=c, row=r, padx=5, pady=5)
+            self.fileButtons[file] = tk.Button(self.window, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
+            self.fileButtons[file].grid(column=c, row=r, padx=5, pady=5)
             r += 1
-            fileLabels[file] = tk.Label(self.window, text=file)
-            fileLabels[file].grid(column=c, row=r, padx=5)
+            self.fileLabels[file] = tk.Label(self.window, text=file)
+            self.fileLabels[file].grid(column=c, row=r, padx=5)
             r -= 1
 
             c += 1
