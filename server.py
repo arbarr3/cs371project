@@ -26,6 +26,11 @@ import json             # Used to access the user plain text file for authentica
 #
 #------------------------------------------------------------------------------
 _location_ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+_userfiles_ = os.path.join(_location_, "users")
+if not os.path.isdir(_userfiles_):
+    os.mkdir(_userfiles_)
+
 _users_ = os.path.join(_location_, "users.json")
 _dirTree_ = [ 
     {
@@ -96,7 +101,7 @@ class ClientThread(threading.Thread):
 
         # Loop continues provided client has not disconnected
         # Server recognizes disconnects via the LOGOUT command
-        while (userConnected):                
+        while (userConnected):
             credentials = self.sock.recv(SIZE).decode(FORMAT)   # In response to LOGIN@ request, client transmits credentials to authenticate
             user, password = credentials.split("@")             # Split credentials from "username@password" into seperate (str) variables
 
@@ -105,14 +110,19 @@ class ClientThread(threading.Thread):
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
                     self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful
-                    self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
+                    # Not strictly necessary # self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
+                    
+                    currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
+                    if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
+                        os.mkdir(currentDir)                                    # make one
+
                     print(" > " + user + " has successfully logged in")
                     break                                       
 
             # If credential pair was not found in _users_ dict, a response needs to be sent to client
             # Because userAuth is false, the main while loop will not be entered and server will wait for new credentials
             if(not userAuth):
-                self.sock.send("REJECT".encode(FORMAT))                         # Sending anything other than ACCEPT will cause client to loop back into resending credentials
+                self.sock.send("REJECT@Invalid username or password.".encode(FORMAT))   # Sending anything other than ACCEPT will cause client to loop back into resending credentials
                 print(" > " + user + " failed login attempt.")  
 
             # Once user credentials are authenticated, the server begins to accept client requests
@@ -136,6 +146,46 @@ class ClientThread(threading.Thread):
                 for i in range (1, len(data)):  # Capture all sent arguments
                     args.append(data[i])        # Populate list with command's arguments
 
+                #-----------------------------------------------------------------------------
+                #   Command:    GETDIR
+                #   Args   :    []
+                #   Purpose:    Client requests the structure of the current directory
+                #   Returns:    Sends a dictionary containing current directory's subdirs and files
+                #   Status :    
+                #-----------------------------------------------------------------------------
+                if cmd == "GETDIR":
+                    dirContent = self.getDirectory(currentDir)
+                    print(f"sending: {dirContent}")
+                    send_data = pickle.dumps(dirContent)
+                    self.sock.send(send_data)
+                
+                #-----------------------------------------------------------------------------
+                #   Command:    CHANGEDIR
+                #   Args   :    [dirname]
+                #   Purpose:    Client requests to navigate to another directory.  Must be navigable from current directory (i.e. no jumping to root or bottom of tree).
+                #   Returns:    Sends the client the new directory tree once dir's changed or FAIL@message.
+                #   Status :    
+                #-----------------------------------------------------------------------------
+                if cmd == "CHANGEDIR":
+                    navigableDirs = [x for x in os.listdir(currentDir) if not os.path.isfile(x)]                # Get a list of directorys in the current directory
+                    if args[0] == "..":                                                                         # If the user wants to navigate up
+                        if currentDir == os.path.join(_userfiles_, user):                                       # if we're already in the user's top directory
+                            self.sock.send("FAIL@Already at root, cannot navigate higher.".encode(FORMAT))      # Tell them to knock that l337 h4X0r shit off
+                        else:
+                            currentDir = os.path.abspath(os.path.join(currentDir, os.pardir))
+                            dirContent = self.getDirectory(currentDir)
+                            if currentDir != os.path.join(_userfiles_, user):
+                                dirContent["dirs"].append("..")
+                            send_data = pickle.dumps(dirContent)
+                            self.sock.send(send_data)
+                    elif args[0] in navigableDirs:
+                        currentDir = args[0]
+                        dirContent = self.getDirectory(currentDir)
+                        dirContent["dirs"].append("..")
+                        send_data = pickle.dumps(dirContent)
+                        self.sock.send(send_data)
+                    else:
+                        self.sock.send("FAIL@Attempted to navigate to unknown directory.".encode(FORMAT))
 
                 #-----------------------------------------------------------------------------
                 #   Command:    LOGOUT
@@ -230,6 +280,8 @@ class ClientThread(threading.Thread):
         self.sock.close()
         print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
 
+    def getDirectory(self, currentDir:str) -> dict:
+        return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))], "files": [x for x in os.listdir(currentDir) if os.path.isfile(os.path.join(currentDir,x))]}
 
 #def populateDirectory():
 
