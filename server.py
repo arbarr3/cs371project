@@ -59,10 +59,12 @@ _dirTree_ = [
 #
 #------------------------------------------------------------------------------
 IP = "localhost"
+IP = "169.254.40.234"
 #IP = "10.113.32.57"
 PORT = 4450
 SIZE = 1024
 FORMAT = "utf-8"
+LOCK = threading.Lock()
 
 # Async Client Handler
 class ClientThread(threading.Thread):   
@@ -74,7 +76,6 @@ class ClientThread(threading.Thread):
         threading.Thread.__init__(self)         # Execute async run(self) method
         print(" > New client thread started on " + ip + ":" + str(port))
     
-
     #--------------------------------------------------------------------------
     # Threading run() method
     # Purpose:  Handles the intents of a connected client by mapping requests to server responses
@@ -91,7 +92,7 @@ class ClientThread(threading.Thread):
         #
         #            Server                                              Client
         #   1   Sends "LOGIN@"                      --->        <Enters authentication loop>
-        #   2   <Checks credentials for auth>       <---         Sends "<users>@<password>"
+        #   2   <Checks credentials for auth>       <---        Sends "<users>@<password>"
         #   3   Auth Success: sends "ACCEPT"        --->        <Waits for welcome message, exits auth loop>
         #   3   Auth Fail:    sends "REJECT"        --->        <Prints error, reprompts for credentials>
         #                                                       <Does NOT wait for second message>
@@ -128,7 +129,8 @@ class ClientThread(threading.Thread):
             # Once user credentials are authenticated, the server begins to accept client requests
             # This loop will run until the LOGOUT command is transmitted
             while(userAuth):
-                   
+                self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
+
                 #========================================= Main Command Flow Control #==============================================
                 #-------------------------------------------------------------------------------------------------------------------
                 #
@@ -207,6 +209,19 @@ class ClientThread(threading.Thread):
                     filesize = int(args.pop())
                     filename = args.pop()
 
+                    filepath = os.path.join(os.getcwd(), "foo")
+                    filepath = os.path.join(filepath, filename)
+                    print(" > Attempting to upload " + filename + " to " + filepath)
+
+                    f = open("received.JSON", "wb")
+                    l = self.sock.recv(SIZE)
+                    print(l)
+                    while(l):
+                        print("Reading...")
+                        f.write(l)
+                        print("Writing...")
+                        l = self.sock.recv(SIZE)
+                    f.close()
                     send_data = "OK@"
                     send_data += "I wish I could send files..."
                     self.sock.send(send_data.encode(FORMAT))
