@@ -217,7 +217,6 @@ class ClientThread(threading.Thread):
                         bytes_read = self.sock.recv(SIZE)   # read 1024 bytes from the socket (receive)
                         f.write(bytes_read)                 # write to the file the bytes we just received
                                                             # TODO Keep track of the bytes / second here
-                        #bytes_received += int.from_bytes(bytes_read)
                         bytes_received += sys.getsizeof(bytes_read)
                     f.close()
 

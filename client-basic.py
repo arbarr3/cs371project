@@ -65,7 +65,7 @@ def main():
         if cmd == "TASK":
             client.send(cmd.encode(FORMAT))
         elif "UPLOAD@" in cmd:
-            filename = "Test.png"
+            filename = "Test.jpg"
             filesize = os.path.getsize(filename)
             cmd += filename + "@" + str(filesize)
             client.send(cmd.encode(FORMAT))
