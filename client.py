@@ -4,7 +4,50 @@ from tkinter import SUNKEN, ttk
 from tkinter import StringVar
 import socket
 import pickle
-import time
+from turtle import color
+
+class UIClickable(tk.Canvas):
+    def __init__(
+        self,
+        window,
+        width = 0,
+        height = 0,
+        image = None,
+        clickFun = None,
+        hoverFun = None,
+        description = None,
+        descriptionText = "",
+        hoverInColor = "#e1e1e1",
+        hoverOutColor = "white"
+        ):
+        tk.Canvas.__init__(self, window, width=width, height=height)
+
+        self.clickFun = clickFun
+        self.hoverFun = hoverFun
+        self.description = description
+        self.descriptionText = descriptionText
+        self.hoverInColor = hoverInColor
+        self.hoverOutColor = hoverOutColor
+
+        self.button = self.create_image(5,4, anchor="nw", image=image)
+        
+        self.tag_bind(self.button, "<Enter>", self.hover)
+        self.tag_bind(self.button, "<Leave>", self.outHover)
+        self.tag_bind(self.button, "<Button-1>", self.onClick)
+    
+    def hover(self, e):
+        self.configure(bg=self.hoverInColor)
+        if self.description is not None:
+            self.description.set(self.descriptionText)
+        if self.hoverFun is not None:
+            self.hoverFun()
+    def outHover(self, e):
+        if self.description is not None:
+            self.description.set("")
+        self.configure(bg=self.hoverOutColor)
+    def onClick(self, e):
+        if self.clickFun is not None:
+            self.clickFun()
 
 class GUIWindow:
     SIZE = 1024
@@ -19,12 +62,52 @@ class GUIWindow:
         self.client = clientSocket
         self.folderImage = tk.PhotoImage(file="./images/folder.png")
         self.fileImage = tk.PhotoImage(file="./images/file.png")
+        self.uploadImage = tk.PhotoImage(file="./images/upload.png")
+        self.newFolderImage = tk.PhotoImage(file="./images/newFolder.png")
         self.dirButtons = {}
         self.dirLabels = {}
         self.fileButtons = {}
         self.fileLabels = {}
+        self.gridColumn = 0
+        self.gridRow = 0
+
+        self.buildMenubar()
         self.updateDirectory()
     
+    def buildMenubar(self):
+        localRow = 0
+        localCol = 0
+        menuFrame = tk.Frame(self.window)
+        menuFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
+        self.gridRow += 1
+
+        buttonDescriptionString = tk.StringVar()
+        buttonDescription = tk.Message(menuFrame, textvariable=buttonDescriptionString)
+        buttonDescription.configure(width=300)
+
+        newFolder = UIClickable(menuFrame, 36, 34, image=self.newFolderImage, clickFun=self.makeNewFolder, description=buttonDescriptionString, descriptionText="New Folder")
+        newFolder.grid(row=localRow, column=localCol, sticky="nw")
+        localCol += 1
+        uploadButton = UIClickable(menuFrame, 36, 34, image=self.uploadImage, clickFun=self.uploadFile, description=buttonDescriptionString, descriptionText="Upload File")
+        uploadButton.grid(row=localRow, column=localCol, sticky="nw")
+        localCol += 1
+        
+        buttonDescription.grid(row=localRow, column=localCol, sticky="w")
+        
+        menuBarFrame = tk.Frame(self.window)
+        menuBarFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
+        bar = tk.Canvas(menuBarFrame, height=6, width=800)
+        bar.grid(row=localRow, column=localCol, sticky="nw")
+        bar.create_line(5,5,790,5)
+        self.gridRow += 1
+
+    def makeNewFolder(self):
+        print("make a new folder bro")
+        
+
+    def uploadFile(self):
+        print("upload some shit bro")
+
     def updateDirectory(self):
         self.client.send("GETDIR".encode(self.FORMAT))
         data = self.client.recv(self.SIZE)
@@ -33,36 +116,40 @@ class GUIWindow:
         for i in [*self.dirButtons, *self.dirLabels, *self.fileButtons, *self.fileLabels]:
             i.destroy()
 
-        c = 0
-        r = 0
         print(f"received: {dirsAndFiles}")
+        itemsFrame = tk.Frame(self.window)
+        itemsFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
+        localRow = 0
+        localCol = 0
         for dir in dirsAndFiles["dirs"]:
-            self.dirButtons[dir] = tk.Button(self.window, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
-            self.dirButtons[dir].grid(column=c, row=r, padx=5, pady=5)
-            r += 1
-            self.dirLabels[dir] = tk.Label(self.window, text=dir)
-            self.dirLabels[dir].grid(column=c, row=r, padx=5)
-            r -= 1
+            self.dirButtons[dir] = tk.Button(itemsFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
+            self.dirButtons[dir].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
+            localRow += 1
+            self.dirLabels[dir] = tk.Label(itemsFrame, text=dir)
+            self.dirLabels[dir].grid(column=localCol, row=localRow, padx=5)
+            localRow -= 1
 
-            c += 1
-            if c > 5:
-                c = 0
-                r += 1
+            localCol += 1
+            if localCol > 5:
+                localCol = 0
+                localRow += 1
+
         for file in dirsAndFiles["files"]:
-            self.fileButtons[file] = tk.Button(self.window, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
-            self.fileButtons[file].grid(column=c, row=r, padx=5, pady=5)
-            r += 1
-            self.fileLabels[file] = tk.Label(self.window, text=file)
-            self.fileLabels[file].grid(column=c, row=r, padx=5)
-            r -= 1
+            self.fileButtons[file] = tk.Button(itemsFrame, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
+            self.fileButtons[file].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
+            localRow += 1
+            self.fileLabels[file] = tk.Label(itemsFrame, text=file)
+            self.fileLabels[file].grid(column=localCol, row=localRow, padx=5)
+            localRow -= 1
 
-            c += 1
-            if c > 5:
-                c = 0
-                r += 1
+            localCol += 1
+            if localCol > 5:
+                localCol = 0
+                localRow += 1
 
     def dieGracefully(self):
-        self.client.send("LOGOUT".encode(self.FORMAT))
+        if self.client:
+            self.client.send("LOGOUT".encode(self.FORMAT))
         self.rootWindow.destroy()
     
     def navigateTo(self, dir):

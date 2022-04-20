@@ -266,15 +266,24 @@ class ClientThread(threading.Thread):
                 #               TODO Needs to handle edge case; duplicate directory names
                 #-----------------------------------------------------------------------------
                 elif cmd == "MKDIR":
-                    dir = args.pop()
-                    # Determine if arg is a key in the dirTree at the current dir
-                    # if arg is a key in thisDict
-                        # self.sock.send("NK@Error. Directory with that filename exists. Please retry.").encode(FORMAT))
-                    # else (indent and do the rest)
-                    path = os.path.join(_location_, dir)
-                    os.mkdir(path)
-                    print(" > New directory " + dir + " has been created")
-                    self.sock.send("OK@New directory has been created".encode(FORMAT))
+                    # dir = args.pop()
+                    # # Determine if arg is a key in the dirTree at the current dir
+                    # # if arg is a key in thisDict
+                    #     # self.sock.send("NK@Error. Directory with that filename exists. Please retry.").encode(FORMAT))
+                    # # else (indent and do the rest)
+                    # path = os.path.join(_location_, dir)
+                    # os.mkdir(path)
+                    # print(" > New directory " + dir + " has been created")
+                    # self.sock.send("OK@New directory has been created".encode(FORMAT))
+                    newDir = args[1]
+                    dirContent = self.getDirectory(currentDir)
+                    if newDir not in dirContent["dirs"]:
+                        os.mkdir(os.path.join(currentDir,newDir))
+                        send_data = f"SUCCESS@New Directory {newDir} was created."
+                    else:
+                        send_data = f"FAIL@The directory {newDir} aleady exists."
+                    self.sock.send(send_data.encode(FORMAT))
+
                 
                 #DIR LIST (ls) TODO
                 #DIR CHANGE (cd) TODO
