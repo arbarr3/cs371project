@@ -10,7 +10,8 @@
 #==============================================================================
 
 from calendar import c
-import os               # Used for filepath referencing
+import os
+import sys               # Used for filepath referencing
 import tqdm             # Used to display file transfer progess within terminal
 import shutil           # Used for deleting directories
 import socket           # Used to implement python socket networking functionality
@@ -110,7 +111,8 @@ class ClientThread(threading.Thread):
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
                     self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful
-                    # Not strictly necessary # self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
+                    # TOO REMOVE ME FOR ALEX
+                    self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
                     
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
@@ -204,21 +206,23 @@ class ClientThread(threading.Thread):
                     filesize = int(args.pop())
                     filename = args.pop()
 
-                    filepath = os.path.join(os.getcwd(), "foo")
+                    filepath = os.path.join(os.getcwd(), "bar")
                     filepath = os.path.join(filepath, filename)
                     print(" > Attempting to upload " + filename + " to " + filepath)
 
-                    f = open("received.JSON", "wb")
-                    l = self.sock.recv(SIZE)
-                    print(l)
-                    while(l):
-                        print("Reading...")
-                        f.write(l)
-                        print("Writing...")
-                        l = self.sock.recv(SIZE)
+                    bytes_received = 0  # Compared to the filesze to determine when transmission is complete
+                    
+                    f = open(filepath, "wb")
+                    while bytes_received < int(filesize):
+                        bytes_read = self.sock.recv(SIZE)   # read 1024 bytes from the socket (receive)
+                        f.write(bytes_read)                 # write to the file the bytes we just received
+                                                            # TODO Keep track of the bytes / second here
+                        #bytes_received += int.from_bytes(bytes_read)
+                        bytes_received += sys.getsizeof(bytes_read)
                     f.close()
+
                     send_data = "OK@"
-                    send_data += "I wish I could send files..."
+                    send_data += "Did I receive that file???"
                     self.sock.send(send_data.encode(FORMAT))
 
                 #-----------------------------------------------------------------------------
