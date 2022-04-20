@@ -113,8 +113,6 @@ class GUIWindow:
         data = self.client.recv(self.SIZE)
         dirsAndFiles = pickle.loads(data)
 
-        #for i in [*self.dirButtons, *self.dirLabels, *self.fileButtons, *self.fileLabels]:
-        #    i.destroy()
         for i in self.dirButtons.keys():
             self.dirButtons[i].destroy()
         for i in self.dirLabels.keys():
@@ -156,8 +154,7 @@ class GUIWindow:
                 localRow += 1
 
     def dieGracefully(self):
-        if self.client:
-            self.client.send("LOGOUT".encode(self.FORMAT))
+        self.client.send("LOGOUT".encode(self.FORMAT))
         self.rootWindow.destroy()
     
     def navigateTo(self, dir):
@@ -177,6 +174,7 @@ class ConnectionWindow:
     xpad = 5
     
     def __init__(self, rootWindow):
+        self.client = None
         self.rootWindow = rootWindow
         self.window = tk.Toplevel(rootWindow)
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
@@ -204,6 +202,7 @@ class ConnectionWindow:
         connectButton = tk.Button(self.window, text="Connect")
         connectButton.grid(row=5, column=0, columnspan=2, padx=self.xpad)
         connectButton.bind("<Button-1>", self.connect)
+        self.window.bind("<Return>", self.connect)
 
     def connect(self, event):
         loggingIn = True
@@ -229,7 +228,8 @@ class ConnectionWindow:
                 print(f"Error: Unexpected response -> {data}")
     
     def dieGracefully(self):
-        self.client.send("LOGOUT".encode(self.FORMAT))
+        if self.client is not None:
+            self.client.send("LOGOUT".encode(self.FORMAT))
         self.rootWindow.destroy()
 
 
