@@ -113,8 +113,16 @@ class GUIWindow:
         data = self.client.recv(self.SIZE)
         dirsAndFiles = pickle.loads(data)
 
-        for i in [*self.dirButtons, *self.dirLabels, *self.fileButtons, *self.fileLabels]:
-            i.destroy()
+        #for i in [*self.dirButtons, *self.dirLabels, *self.fileButtons, *self.fileLabels]:
+        #    i.destroy()
+        for i in self.dirButtons.keys():
+            self.dirButtons[i].destroy()
+        for i in self.dirLabels.keys():
+            self.dirLabels[i].destroy()
+        for i in self.fileButtons.keys():
+            self.fileButtons[i].destroy()
+        for i in self.fileLabels.keys():
+            self.fileLabels[i].destroy()
 
         print(f"received: {dirsAndFiles}")
         itemsFrame = tk.Frame(self.window)
@@ -154,6 +162,11 @@ class GUIWindow:
     
     def navigateTo(self, dir):
         print(f"trying to navigate to {dir}")
+        self.client.send(f"CHANGEDIR@{dir}".encode(self.FORMAT))
+        data = self.client.recv(self.SIZE).decode(self.FORMAT)
+        if "SUCCESS" in data:
+            self.updateDirectory()
+
     
     def downloadFile(self, file):
         print(f"trying to download {file}")

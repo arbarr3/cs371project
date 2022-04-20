@@ -154,6 +154,8 @@ class ClientThread(threading.Thread):
                 #-----------------------------------------------------------------------------
                 if cmd == "GETDIR":
                     dirContent = self.getDirectory(currentDir)
+                    if currentDir != os.path.join(_userfiles_, user):
+                        dirContent["dirs"].append("..")
                     print(f"sending: {dirContent}")
                     send_data = pickle.dumps(dirContent)
                     self.sock.send(send_data)
@@ -175,14 +177,10 @@ class ClientThread(threading.Thread):
                             dirContent = self.getDirectory(currentDir)
                             if currentDir != os.path.join(_userfiles_, user):
                                 dirContent["dirs"].append("..")
-                            send_data = pickle.dumps(dirContent)
-                            self.sock.send(send_data)
+                            self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
                     elif args[0] in navigableDirs:
-                        currentDir = args[0]
-                        dirContent = self.getDirectory(currentDir)
-                        dirContent["dirs"].append("..")
-                        send_data = pickle.dumps(dirContent)
-                        self.sock.send(send_data)
+                        currentDir = os.path.join(currentDir, args[0])
+                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
                     else:
                         self.sock.send("FAIL@Attempted to navigate to unknown directory.".encode(FORMAT))
 
