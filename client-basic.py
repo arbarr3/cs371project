@@ -5,13 +5,14 @@
 # Author : Ayesha S. Dina
 
 import os
+import sys
 import tqdm
 import socket
 import pickle
 
 
 IP = "localhost"
-IP = "169.254.40.234"
+#IP = "169.254.40.234"
 #IP = "10.113.32.57"
 PORT = 4450
 ADDR = (IP,PORT)
@@ -64,20 +65,22 @@ def main():
         if cmd == "TASK":
             client.send(cmd.encode(FORMAT))
         elif "UPLOAD@" in cmd:
-            filename = "users.json"
+            filename = "Test.jpg"
             filesize = os.path.getsize(filename)
             cmd += filename + "@" + str(filesize)
-
             client.send(cmd.encode(FORMAT))
+            
+            print("> Sending " + filename + " of size " + str(filesize) + " bytes")
+
             #progressBar = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+            bytes_sent = 0
 
             f = open(filename, "rb")
-            l = f.read(SIZE)
-            while(l):
-                print("Reading...")
-                client.send(l)
-                print("Sent a buffer size of data...")
-                l = f.read(SIZE) # TODO FIX THIS LINE
+            while bytes_sent < filesize:
+                bytes_read = f.read(SIZE)
+                client.send(bytes_read)
+                bytes_sent += sys.getsizeof(bytes_read)
+                #print(bytes_sent)
             f.close()
 
         elif "DELFILE@" in cmd:
