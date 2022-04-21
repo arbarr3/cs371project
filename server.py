@@ -292,7 +292,8 @@ class ClientThread(threading.Thread):
                 #-----------------------------------------------------------------------------
                 elif cmd == "RENAME":
                     os.rename(os.path.join(currentDir, args[0]), os.path.join(currentDir, args[1]))
-                    if args[1] in self.getDirectory(currentDir)["files"]:
+                    dirsAndFiles = self.getDirectory(currentDir)
+                    if args[1] in dirsAndFiles["files"] or args[1] in dirsAndFiles["dirs"]:
                         send_data = f"SUCCESS@Renamed {args[0]} to {args[1]}"
                     else:
                         send_data = f"FAIL@Failed to rename {args[0]} to {args[1]}"

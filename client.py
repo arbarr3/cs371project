@@ -59,6 +59,7 @@ class GUIWindow:
         self.window = tk.Toplevel(rootWindow)
         self.window.geometry(self.STDGEO)
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
+        self.window.bind("<Return>", lambda e: self.window.focus_force())
         self.client = clientSocket
         self.folderImage = tk.PhotoImage(file="./images/folder.png")
         self.fileImage = tk.PhotoImage(file="./images/file.png")
@@ -66,6 +67,7 @@ class GUIWindow:
         self.newFolderImage = tk.PhotoImage(file="./images/newFolder.png")
         self.dirButtons = {}
         self.dirLabels = {}
+        self.dirLabelText = {}
         self.fileButtons = {}
         self.fileLabels = {}
         self.fileLabelText = {}
@@ -133,8 +135,11 @@ class GUIWindow:
             self.dirButtons[dir] = tk.Button(itemsFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
             self.dirButtons[dir].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
             localRow += 1
-            self.dirLabels[dir] = tk.Label(itemsFrame, text=dir)
+            self.dirLabelText[dir] = tk.StringVar(value=dir)
+            self.dirLabels[dir] = tk.Entry(itemsFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
             self.dirLabels[dir].grid(column=localCol, row=localRow, padx=5)
+            self.dirLabels[dir].bind("<Button-1>", lambda e, f=dir: self.changeDirname(e,f))
+            self.dirLabels[dir].config(validate="focusout", validatecommand=(callback, "%s", dir))
             localRow -= 1
 
             localCol += 1
@@ -147,7 +152,7 @@ class GUIWindow:
             self.fileButtons[file].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
             localRow += 1
             self.fileLabelText[file] = tk.StringVar(value=file)
-            self.fileLabels[file] = tk.Entry(itemsFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", relief=tk.FLAT, state=tk.DISABLED)
+            self.fileLabels[file] = tk.Entry(itemsFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
             self.fileLabels[file].grid(column=localCol, row=localRow, padx=5)
             self.fileLabels[file].bind("<Button-1>", lambda e, f=file: self.changeFilename(e,f))
             self.fileLabels[file].config(validate="focusout", validatecommand=(callback, "%s", file))
@@ -160,6 +165,11 @@ class GUIWindow:
 
     def changeFilename(self, e, file):
         self.fileLabels[file].configure(state=tk.NORMAL)
+        self.fileLabels[file].select_range(0, tk.END)
+    
+    def changeDirname(self, e, dir):
+        self.dirLabels[dir].configure(state=tk.NORMAL)
+        self.dirLabels[dir].select_range(0, tk.END)
 
     def sendFilename(self, newName, oldName):
         self.client.send(f"RENAME@{oldName}@{newName}".encode(self.FORMAT))
