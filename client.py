@@ -4,7 +4,7 @@ from tkinter import SUNKEN, ttk
 from tkinter import StringVar
 import socket
 import pickle
-from turtle import color
+
 
 class UIClickable(tk.Canvas):
     def __init__(
@@ -68,6 +68,7 @@ class GUIWindow:
         self.dirLabels = {}
         self.fileButtons = {}
         self.fileLabels = {}
+        self.fileLabelText = {}
         self.gridColumn = 0
         self.gridRow = 0
 
@@ -127,6 +128,7 @@ class GUIWindow:
         itemsFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
         localRow = 0
         localCol = 0
+        callback = self.window.register(self.sendFilename)
         for dir in dirsAndFiles["dirs"]:
             self.dirButtons[dir] = tk.Button(itemsFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
             self.dirButtons[dir].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
@@ -144,14 +146,29 @@ class GUIWindow:
             self.fileButtons[file] = tk.Button(itemsFrame, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
             self.fileButtons[file].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
             localRow += 1
-            self.fileLabels[file] = tk.Label(itemsFrame, text=file)
+            self.fileLabelText[file] = tk.StringVar(value=file)
+            self.fileLabels[file] = tk.Entry(itemsFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", relief=tk.FLAT, state=tk.DISABLED)
             self.fileLabels[file].grid(column=localCol, row=localRow, padx=5)
+            self.fileLabels[file].bind("<Button-1>", lambda e, f=file: self.changeFilename(e,f))
+            self.fileLabels[file].config(validate="focusout", validatecommand=(callback, "%s", file))
             localRow -= 1
 
             localCol += 1
             if localCol > 5:
                 localCol = 0
                 localRow += 1
+
+    def changeFilename(self, e, file):
+        self.fileLabels[file].configure(state=tk.NORMAL)
+
+    def sendFilename(self, newName, oldName):
+        self.client.send(f"RENAME@{oldName}@{newName}".encode(self.FORMAT))
+        data = self.client.recv(self.SIZE).decode(self.FORMAT)
+        if "SUCCESS" in data:
+            return True
+        else:
+            print(data.split("@")[1])
+            return False
 
     def dieGracefully(self):
         self.client.send("LOGOUT".encode(self.FORMAT))
@@ -177,6 +194,7 @@ class ConnectionWindow:
         self.client = None
         self.rootWindow = rootWindow
         self.window = tk.Toplevel(rootWindow)
+        self.window.focus_force()
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         ipLabel = tk.Label(self.window, text="IPv4 Address:")
         ipLabel.grid(column=0, row=0, sticky="E", padx=self.xpad)

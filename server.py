@@ -110,9 +110,7 @@ class ClientThread(threading.Thread):
             for key, value in _users_.items():
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
-                    self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful
-                    # TOO REMOVE ME FOR ALEX
-                    self.sock.send("OK@Welcome to the server".encode(FORMAT))   # Send welcome message to client
+                    self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful                    
                     
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
@@ -276,13 +274,28 @@ class ClientThread(threading.Thread):
                     # os.mkdir(path)
                     # print(" > New directory " + dir + " has been created")
                     # self.sock.send("OK@New directory has been created".encode(FORMAT))
-                    newDir = args[1]
+                    newDir = args[0]
                     dirContent = self.getDirectory(currentDir)
                     if newDir not in dirContent["dirs"]:
                         os.mkdir(os.path.join(currentDir,newDir))
                         send_data = f"SUCCESS@New Directory {newDir} was created."
                     else:
                         send_data = f"FAIL@The directory {newDir} aleady exists."
+                    self.sock.send(send_data.encode(FORMAT))
+                
+                #-----------------------------------------------------------------------------
+                #   Command:    RENAME
+                #   Args   :    [oldName]@[newName]
+                #   Purpose:    This lets the user rename a file or directory.
+                #   Status :    25% TODO Needs to evaluate based on socket's current working directory, not _location_\
+                #               TODO Needs to handle edge case; duplicate directory names
+                #-----------------------------------------------------------------------------
+                elif cmd == "RENAME":
+                    os.rename(os.path.join(currentDir, args[0]), os.path.join(currentDir, args[1]))
+                    if args[1] in self.getDirectory(currentDir)["files"]:
+                        send_data = f"SUCCESS@Renamed {args[0]} to {args[1]}"
+                    else:
+                        send_data = f"FAIL@Failed to rename {args[0]} to {args[1]}"
                     self.sock.send(send_data.encode(FORMAT))
 
                 
