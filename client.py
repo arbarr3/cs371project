@@ -105,8 +105,30 @@ class GUIWindow:
         self.gridRow += 1
 
     def makeNewFolder(self):
-        print("make a new folder bro")
+        makeFolderCallback = self.window.register(self.sendNewFolder)
+        dir = str(len(self.dirButtons))
+        self.dirButtons[dir] = tk.Button(self.dirsAndFilesFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
+        self.dirButtons[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
+        self.dirsAndFilesRow += 1
+        self.dirLabelText[dir] = tk.StringVar(value="New Folder")
+        self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+        self.dirLabels[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
+        self.dirLabels[dir].bind("<Button-1>", lambda e, f=dir: self.changeDirname(e,f))
+        self.dirLabels[dir].config(validate="focusout", validatecommand=(makeFolderCallback, "%s", dir))
+        self.dirLabels[dir].focus_set()
+        self.dirsAndFilesRow -= 1
+    
+    def sendNewFolder(self, folderName, dir):
+        self.dirButtons[dir].configure(command=lambda d = folderName: self.navigateTo(d))
+        self.client.send(f"MKDIR@{folderName}".encode(self.FORMAT))
+        data = self.client.recv(self.SIZE).decode(self.FORMAT)
+        if "SUCCESS" in data:
+            return True
         
+        print(data.split("@")[1])
+        self.dirButtons[dir].destroy()
+        self.dirLabels[dir].destroy()
+        return False
 
     def uploadFile(self):
         print("upload some shit bro")
@@ -126,42 +148,43 @@ class GUIWindow:
             self.fileLabels[i].destroy()
 
         print(f"received: {dirsAndFiles}")
-        itemsFrame = tk.Frame(self.window)
-        itemsFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
-        localRow = 0
-        localCol = 0
-        callback = self.window.register(self.sendFilename)
+        self.dirsAndFilesFrame = tk.Frame(self.window)
+        self.dirsAndFilesFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
+        self.dirsAndFilesRow = 0
+        self.dirsAndFilesCol = 0
+        
+        renameEntryCallback = self.window.register(self.rename)
         for dir in dirsAndFiles["dirs"]:
-            self.dirButtons[dir] = tk.Button(itemsFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
-            self.dirButtons[dir].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
-            localRow += 1
+            self.dirButtons[dir] = tk.Button(self.dirsAndFilesFrame, image=self.folderImage, command=lambda d = dir: self.navigateTo(d))
+            self.dirButtons[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
+            self.dirsAndFilesRow += 1
             self.dirLabelText[dir] = tk.StringVar(value=dir)
-            self.dirLabels[dir] = tk.Entry(itemsFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
-            self.dirLabels[dir].grid(column=localCol, row=localRow, padx=5)
+            self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+            self.dirLabels[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
             self.dirLabels[dir].bind("<Button-1>", lambda e, f=dir: self.changeDirname(e,f))
-            self.dirLabels[dir].config(validate="focusout", validatecommand=(callback, "%s", dir))
-            localRow -= 1
+            self.dirLabels[dir].config(validate="focusout", validatecommand=(renameEntryCallback, "%s", dir))
+            self.dirsAndFilesRow -= 1
 
-            localCol += 1
-            if localCol > 5:
-                localCol = 0
-                localRow += 1
+            self.dirsAndFilesCol += 1
+            if self.dirsAndFilesCol > 5:
+                self.dirsAndFilesCol = 0
+                self.dirsAndFilesRow += 2
 
         for file in dirsAndFiles["files"]:
-            self.fileButtons[file] = tk.Button(itemsFrame, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
-            self.fileButtons[file].grid(column=localCol, row=localRow, padx=5, pady=5, sticky="nw")
-            localRow += 1
+            self.fileButtons[file] = tk.Button(self.dirsAndFilesFrame, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
+            self.fileButtons[file].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
+            self.dirsAndFilesRow += 1
             self.fileLabelText[file] = tk.StringVar(value=file)
-            self.fileLabels[file] = tk.Entry(itemsFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
-            self.fileLabels[file].grid(column=localCol, row=localRow, padx=5)
+            self.fileLabels[file] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+            self.fileLabels[file].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
             self.fileLabels[file].bind("<Button-1>", lambda e, f=file: self.changeFilename(e,f))
-            self.fileLabels[file].config(validate="focusout", validatecommand=(callback, "%s", file))
-            localRow -= 1
+            self.fileLabels[file].config(validate="focusout", validatecommand=(renameEntryCallback, "%s", file))
+            self.dirsAndFilesRow -= 1
 
-            localCol += 1
-            if localCol > 5:
-                localCol = 0
-                localRow += 1
+            self.dirsAndFilesCol += 1
+            if self.dirsAndFilesCol > 5:
+                self.dirsAndFilesCol = 0
+                self.dirsAndFilesRow += 2
 
     def changeFilename(self, e, file):
         self.fileLabels[file].configure(state=tk.NORMAL)
@@ -171,7 +194,7 @@ class GUIWindow:
         self.dirLabels[dir].configure(state=tk.NORMAL)
         self.dirLabels[dir].select_range(0, tk.END)
 
-    def sendFilename(self, newName, oldName):
+    def rename(self, newName, oldName):
         self.client.send(f"RENAME@{oldName}@{newName}".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
