@@ -10,8 +10,10 @@
 #==============================================================================
 
 from calendar import c
+import csv
 import os
-import sys               # Used for filepath referencing
+import sys
+import time               # Used for filepath referencing
 import tqdm             # Used to display file transfer progess within terminal
 import shutil           # Used for deleting directories
 import socket           # Used to implement python socket networking functionality
@@ -111,7 +113,7 @@ class ClientThread(threading.Thread):
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
                     self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful                    
-                    
+                    self.sock.send("OK@Welcome to the server".encode(FORMAT))
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
                         os.mkdir(currentDir)                                    # make one
@@ -208,19 +210,25 @@ class ClientThread(threading.Thread):
                     filepath = os.path.join(filepath, filename)
                     print(" > Attempting to upload " + filename + " to " + filepath)
 
-                    bytes_received = 0  # Compared to the filesze to determine when transmission is complete
+                    bytes_received = 0      # Compared to the filesze to determine when transmission is complete
+                    transferRows = []    # List of lists to capture the row data for generating a CSV file of data transfer rates
+                    progressBar = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
                     
                     f = open(filepath, "wb")
                     while bytes_received < int(filesize):
-                        bytes_read = self.sock.recv(SIZE)   # read 1024 bytes from the socket (receive)
-                        f.write(bytes_read)                 # write to the file the bytes we just received
-                                                            # TODO Keep track of the bytes / second here
-                        bytes_received += sys.getsizeof(bytes_read)
+                        bytes_read = self.sock.recv(SIZE)               # Read 1024 bytes from the socket (receive)
+                        f.write(bytes_read)
+                        countBytesRead = len(bytes_read)                # Write to the file the bytes we just received
+                        transferRows.append([time.perf_counter(),       # Add this current data transfer as a data point to data list
+                                              countBytesRead])
+                        bytes_received += countBytesRead
+                        progressBar.update(len(bytes_read))
+
                     f.close()
 
-                    send_data = "OK@"
-                    send_data += "Did I receive that file???"
+                    send_data = "OK@File " + filename + " was transferred"
                     self.sock.send(send_data.encode(FORMAT))
+                    self.makeCSV(transferRows, "UploadServerView")
 
                 #-----------------------------------------------------------------------------
                 #   Command:    DOWNLOAD
@@ -274,7 +282,7 @@ class ClientThread(threading.Thread):
                     # os.mkdir(path)
                     # print(" > New directory " + dir + " has been created")
                     # self.sock.send("OK@New directory has been created".encode(FORMAT))
-                    newDir = args[0]
+                    newDir = args[0]    # RSCS: Should be args[0], as MKDIR@<new_dir> should be sent as command
                     dirContent = self.getDirectory(currentDir)
                     if newDir not in dirContent["dirs"]:
                         os.mkdir(os.path.join(currentDir,newDir))
@@ -317,10 +325,18 @@ class ClientThread(threading.Thread):
         print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
 
     def getDirectory(self, currentDir:str) -> dict:
-        return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))], "files": [x for x in os.listdir(currentDir) if os.path.isfile(os.path.join(currentDir,x))]}
-
-#def populateDirectory():
-
+        return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))],
+                "files": [x for x in os.listdir(currentDir) if os.path.isfile(os.path.join(currentDir,x))]}
+    
+    def makeCSV(self, dataRows, filename):
+        filename += ".csv"
+        fieldHeaders = ["Microseconds", "Bytes"]
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(fieldHeaders)
+            for row in dataRows[1:]:
+                csvwriter.writerow(row)
+                
 # Server Startup    
 server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)       # Using IPV4 and TCP connection
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)    # Prevent bind() exceptions

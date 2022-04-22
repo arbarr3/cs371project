@@ -4,7 +4,8 @@ from pathlib import Path
 
 list = {
     "rscris2": "foo",
-    "aberra2": "bar"
+    "aberra2": "bar",
+    "bob": "builder"
 }
 
 path = os.getcwd()
