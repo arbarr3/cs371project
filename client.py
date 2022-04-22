@@ -1,4 +1,3 @@
-import sys
 import tkinter as tk
 from tkinter import SUNKEN, ttk
 from tkinter import StringVar
@@ -18,7 +17,8 @@ class UIClickable(tk.Canvas):
         description = None,
         descriptionText = "",
         hoverInColor = "#e1e1e1",
-        hoverOutColor = "white"
+        hoverOutColor = "white",
+        toggleBorderColor = "red"
         ):
         tk.Canvas.__init__(self, window, width=width, height=height)
 
@@ -28,6 +28,8 @@ class UIClickable(tk.Canvas):
         self.descriptionText = descriptionText
         self.hoverInColor = hoverInColor
         self.hoverOutColor = hoverOutColor
+        self.toggleBorderColor = toggleBorderColor
+        self.toggled = False
 
         self.button = self.create_image(5,4, anchor="nw", image=image)
         
@@ -48,6 +50,15 @@ class UIClickable(tk.Canvas):
     def onClick(self, e):
         if self.clickFun is not None:
             self.clickFun()
+    def toggle(self, toggledText=""):
+        if not self.toggled:
+            self.toggled = True
+            self.configure(bg=self.hoverInColor, highlightbackground=self.toggleBorderColor)
+            self.tag_unbind(self.button,"<Leave>")
+        else:
+            self.toggled = False
+            self.configure(bg=self.hoverOutColor, highlightbackground=self.hoverOutColor)
+            self.tag_bind(self.button, "<Leave>", self.outHover)
 
 class GUIWindow:
     SIZE = 1024
@@ -65,6 +76,7 @@ class GUIWindow:
         self.fileImage = tk.PhotoImage(file="./images/file.png")
         self.uploadImage = tk.PhotoImage(file="./images/upload.png")
         self.newFolderImage = tk.PhotoImage(file="./images/newFolder.png")
+        self.deleteImage = tk.PhotoImage(file="./images/delete.png")
         self.dirButtons = {}
         self.dirLabels = {}
         self.dirLabelText = {}
@@ -73,6 +85,7 @@ class GUIWindow:
         self.fileLabelText = {}
         self.gridColumn = 0
         self.gridRow = 0
+        self.deleteMode = False
 
         self.buildMenubar()
         self.updateDirectory()
@@ -90,6 +103,9 @@ class GUIWindow:
 
         newFolder = UIClickable(menuFrame, 36, 34, image=self.newFolderImage, clickFun=self.makeNewFolder, description=buttonDescriptionString, descriptionText="New Folder")
         newFolder.grid(row=localRow, column=localCol, sticky="nw")
+        localCol += 1
+        self.deleteButton = UIClickable(menuFrame, 36, 34, image=self.deleteImage, clickFun=self.deleteObject, description=buttonDescriptionString, descriptionText="Delete")
+        self.deleteButton.grid(row=localRow, column=localCol, sticky="nw")
         localCol += 1
         uploadButton = UIClickable(menuFrame, 36, 34, image=self.uploadImage, clickFun=self.uploadFile, description=buttonDescriptionString, descriptionText="Upload File")
         uploadButton.grid(row=localRow, column=localCol, sticky="nw")
@@ -118,18 +134,34 @@ class GUIWindow:
         self.dirLabels[dir].focus_set()
         self.dirsAndFilesRow -= 1
     
+    def deleteObject(self):
+        self.deleteButton.toggle()
+        self.deleteMode = self.deleteButton.toggled
+
     def sendNewFolder(self, folderName, dir):
         if folderName != dir:
             self.dirButtons[dir].configure(command=lambda d = folderName: self.navigateTo(d))
             self.client.send(f"MKDIR@{folderName}".encode(self.FORMAT))
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             if "SUCCESS" in data:
+                self.updateDirectory()
                 return True
         
             print(data.split("@")[1])
             self.dirButtons[dir].destroy()
             self.dirLabels[dir].destroy()
         return False
+
+    def downloadFile(self, file):
+        if self.deleteMode:
+            self.client.send(f"DELETE@{file}".encode(self.FORMAT))
+            data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            if "SUCCESS" in data:
+                self.updateDirectory()
+            else:
+                print(data)
+        else:
+            print(f"trying to download {file}")
 
     def uploadFile(self):
         print("upload some shit bro")
@@ -201,6 +233,12 @@ class GUIWindow:
         self.client.send(f"RENAME@{oldName}@{newName}".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
+            #widget.configure(command=lambda d = newName: self.navigateTo(d))
+            if oldName in self.dirButtons.keys():
+                self.dirButtons[oldName].configure(command=lambda d = newName: self.navigateTo(d))
+                
+            elif oldName in self.fileButtons.keys():
+                self.fileButtons[oldName].configure(command=lambda d = newName: self.navigateTo(d))
             return True
         else:
             print(data.split("@")[1])
@@ -211,15 +249,15 @@ class GUIWindow:
         self.rootWindow.destroy()
     
     def navigateTo(self, dir):
-        print(f"trying to navigate to {dir}")
-        self.client.send(f"CHANGEDIR@{dir}".encode(self.FORMAT))
+        if self.deleteMode and dir != "..":
+            self.client.send(f"DELETE@{dir}".encode(self.FORMAT))
+        else:
+            print(f"trying to navigate to {dir}")
+            self.client.send(f"CHANGEDIR@{dir}".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
             self.updateDirectory()
 
-    
-    def downloadFile(self, file):
-        print(f"trying to download {file}")
 
 class ConnectionWindow:
     SIZE = 1024

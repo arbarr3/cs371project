@@ -157,7 +157,7 @@ class ClientThread(threading.Thread):
                 if cmd == "GETDIR":
                     dirContent = self.getDirectory(currentDir)
                     if currentDir != os.path.join(_userfiles_, user):
-                        dirContent["dirs"].append("..")
+                        dirContent["dirs"].insert(0,"..")
                     print(f"sending: {dirContent}")
                     send_data = pickle.dumps(dirContent)
                     self.sock.send(send_data)
@@ -178,7 +178,7 @@ class ClientThread(threading.Thread):
                             currentDir = os.path.abspath(os.path.join(currentDir, os.pardir))
                             dirContent = self.getDirectory(currentDir)
                             if currentDir != os.path.join(_userfiles_, user):
-                                dirContent["dirs"].append("..")
+                                dirContent["dirs"].insert(0,"..")
                             self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
                     elif args[0] in navigableDirs:
                         currentDir = os.path.join(currentDir, args[0])
@@ -252,18 +252,29 @@ class ClientThread(threading.Thread):
                         self.sock.send("OK@File has been deleted".encode(FORMAT))
                 
                 #-----------------------------------------------------------------------------
-                #   Command:    DELDIR
-                #   Args   :    [directory_name]
+                #   Command:    DELETE
+                #   Args   :    [directory_name] or [file_name]
                 #   Purpose:    Deletes the supplied directory and all it contains
                 #   Status :    50% TODO Needs to evaluate based on socket's current working directory, not _location_
                 #-----------------------------------------------------------------------------
-                elif cmd == "DELDIR":
-                    dir = args.pop()
-                    dirPath = os.path.join(_location_, dir)
-                    if os.path.exists(dirPath):
-                        shutil.rmtree(dir)
-                        print(" > Directory " + dir + " has been deleted.")
-                        self.sock.send("OK@Directory has been deleted".encode(FORMAT))   
+                elif cmd == "DELETE":
+                    # dir = args.pop()
+                    # dirPath = os.path.join(_location_, dir)
+                    # if os.path.exists(dirPath):
+                    #     shutil.rmtree(dir)
+                    #     print(" > Directory " + dir + " has been deleted.")
+                    #     self.sock.send("OK@Directory has been deleted".encode(FORMAT))
+                    toDelete = os.path.join(currentDir, args[0])
+                    if os.path.exists(toDelete):
+                        if not os.path.isfile(toDelete):
+                            shutil.rmtree(toDelete)
+                        else:
+                            os.remove(toDelete)
+                        send_data = f"SUCCESS@{args[0]} has been deleted."
+                    else:
+                        send_data = f"FAIL@Could not find {toDelete}."
+                    self.sock.send(send_data.encode(FORMAT))
+
 
                 #-----------------------------------------------------------------------------
                 #   Command:    MKDIR
