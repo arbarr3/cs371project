@@ -113,7 +113,7 @@ class ClientThread(threading.Thread):
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
                     self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful                    
-                    #self.sock.send("OK@Welcome to the server".encode(FORMAT))
+                    self.sock.send("OK@Welcome to the server".encode(FORMAT))
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
                         os.mkdir(currentDir)                                    # make one
@@ -209,22 +209,23 @@ class ClientThread(threading.Thread):
                     #filepath = os.path.join(os.getcwd(), "bar")
                     #filepath = os.path.join(filepath, filename)
                     filepath = os.path.join(currentDir, filename)
-                    print(" > Attempting to upload " + filename + " to " + filepath)
+                    print(" > Attempting to upload " + filename)
 
                     bytes_received = 0      # Compared to the filesze to determine when transmission is complete
                     transferRows = []    # List of lists to capture the row data for generating a CSV file of data transfer rates
-                    progressBar = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+                    progressBar = tqdm.tqdm(range(filesize), f" > Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+
+                    timeStart = time.perf_counter()
                     
                     f = open(filepath, "wb")
                     while bytes_received < int(filesize):
-                        bytes_read = self.sock.recv(SIZE)               # Read 1024 bytes from the socket (receive)
+                        bytes_read = self.sock.recv(SIZE)                       # Read 1024 bytes from the socket (receive)
+                        progressBar.update(len(bytes_read))
                         f.write(bytes_read)
-                        countBytesRead = len(bytes_read)                # Write to the file the bytes we just received
-                        transferRows.append([time.perf_counter(),       # Add this current data transfer as a data point to data list
+                        countBytesRead = len(bytes_read)                        # Write to the file the bytes we just received
+                        transferRows.append([time.perf_counter() - timeStart,   # Add this current data transfer as a data point to data list
                                               countBytesRead])
                         bytes_received += countBytesRead
-                        progressBar.update(len(bytes_read))
-
                     f.close()
 
                     send_data = "OK@File " + filename + " was transferred"
@@ -358,7 +359,7 @@ class ClientThread(threading.Thread):
     
     def makeCSV(self, dataRows, filename):
         filename += ".csv"
-        fieldHeaders = ["Microseconds", "Bytes"]
+        fieldHeaders = ["Seconds", "Bytes"]
         with open(filename, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fieldHeaders)
