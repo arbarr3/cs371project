@@ -119,15 +119,16 @@ class GUIWindow:
         self.dirsAndFilesRow -= 1
     
     def sendNewFolder(self, folderName, dir):
-        self.dirButtons[dir].configure(command=lambda d = folderName: self.navigateTo(d))
-        self.client.send(f"MKDIR@{folderName}".encode(self.FORMAT))
-        data = self.client.recv(self.SIZE).decode(self.FORMAT)
-        if "SUCCESS" in data:
-            return True
+        if folderName != dir:
+            self.dirButtons[dir].configure(command=lambda d = folderName: self.navigateTo(d))
+            self.client.send(f"MKDIR@{folderName}".encode(self.FORMAT))
+            data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            if "SUCCESS" in data:
+                return True
         
-        print(data.split("@")[1])
-        self.dirButtons[dir].destroy()
-        self.dirLabels[dir].destroy()
+            print(data.split("@")[1])
+            self.dirButtons[dir].destroy()
+            self.dirLabels[dir].destroy()
         return False
 
     def uploadFile(self):
@@ -188,10 +189,12 @@ class GUIWindow:
 
     def changeFilename(self, e, file):
         self.fileLabels[file].configure(state=tk.NORMAL)
+        self.fileLabels[file].focus()
         self.fileLabels[file].select_range(0, tk.END)
     
     def changeDirname(self, e, dir):
         self.dirLabels[dir].configure(state=tk.NORMAL)
+        self.dirLabels[dir].focus()
         self.dirLabels[dir].select_range(0, tk.END)
 
     def rename(self, newName, oldName):
@@ -227,7 +230,6 @@ class ConnectionWindow:
         self.client = None
         self.rootWindow = rootWindow
         self.window = tk.Toplevel(rootWindow)
-        self.window.focus_force()
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         ipLabel = tk.Label(self.window, text="IPv4 Address:")
         ipLabel.grid(column=0, row=0, sticky="E", padx=self.xpad)
@@ -239,6 +241,7 @@ class ConnectionWindow:
         passwordLabel.grid(column=0, row=3, sticky="E", padx=self.xpad)
         self.ipEntry = tk.Entry(self.window)
         self.ipEntry.grid(column=1, row=0, padx=self.xpad)
+        self.ipEntry.focus()
         self.portEntry = tk.Entry(self.window)
         self.portEntry.grid(column=1, row=1, padx=self.xpad)
         self.userNameEntry = tk.Entry(self.window)

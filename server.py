@@ -261,19 +261,9 @@ class ClientThread(threading.Thread):
                 #   Command:    MKDIR
                 #   Args   :    [directory_name]
                 #   Purpose:    Creates a new directory at the current working directory
-                #   Status :    25% TODO Needs to evaluate based on socket's current working directory, not _location_\
-                #               TODO Needs to handle edge case; duplicate directory names
+                #   Status :    100%
                 #-----------------------------------------------------------------------------
                 elif cmd == "MKDIR":
-                    # dir = args.pop()
-                    # # Determine if arg is a key in the dirTree at the current dir
-                    # # if arg is a key in thisDict
-                    #     # self.sock.send("NK@Error. Directory with that filename exists. Please retry.").encode(FORMAT))
-                    # # else (indent and do the rest)
-                    # path = os.path.join(_location_, dir)
-                    # os.mkdir(path)
-                    # print(" > New directory " + dir + " has been created")
-                    # self.sock.send("OK@New directory has been created".encode(FORMAT))
                     newDir = args[0]
                     dirContent = self.getDirectory(currentDir)
                     if newDir not in dirContent["dirs"]:
@@ -287,8 +277,7 @@ class ClientThread(threading.Thread):
                 #   Command:    RENAME
                 #   Args   :    [oldName]@[newName]
                 #   Purpose:    This lets the user rename a file or directory.
-                #   Status :    25% TODO Needs to evaluate based on socket's current working directory, not _location_\
-                #               TODO Needs to handle edge case; duplicate directory names
+                #   Status :    100%
                 #-----------------------------------------------------------------------------
                 elif cmd == "RENAME":
                     os.rename(os.path.join(currentDir, args[0]), os.path.join(currentDir, args[1]))
