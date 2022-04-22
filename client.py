@@ -174,18 +174,18 @@ class GUIWindow:
                 start = time.time()
                 log = []
                 print(f"filesize: {fileSize}")
-                # while bytesReceived < fileSize:
-                #     bytesRead = self.client.recv(self.SIZE)
+                while bytesReceived < fileSize:
+                    bytesRead = self.client.recv(self.SIZE)
                     
-                #     delta = time.time() - start
-                #     bps = (bytesRead * 8)/delta
-                #     temp = {}
-                #     temp["bps"] = bps
-                #     temp["time"] = delta
-                #     log.append(temp)
+                    delta = time.time() - start
+                    bps = (len(bytesRead) * 8)/delta
+                    temp = {}
+                    temp["bps"] = bps
+                    temp["time"] = delta
+                    log.append(temp)
 
-                #     outFile.write(bytesRead)
-                #     bytesReceived += len(bytesRead)
+                    outFile.write(bytesRead)
+                    bytesReceived += len(bytesRead)
 
 
             else:
@@ -205,7 +205,7 @@ class GUIWindow:
             fileFrame.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             self.dirsAndFilesRow += 1
 
-            speedVal = tk.StringVar(value="Downloading\nat\n0 bps")
+            speedVal = tk.StringVar(value="Uploading\nat\n0 bps")
             uploadSpeed = tk.Label(fileFrame, textvariable=speedVal)
             uploadSpeed.grid(row=0, column=0, sticky="n")
             progress = ttk.Progressbar(fileFrame, length=90)
@@ -214,25 +214,38 @@ class GUIWindow:
             progressLabel = tk.Label(self.dirsAndFilesFrame, text=filename.split("/")[-1])
             progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             
-            with open(filename, 'rb') as inFile:
-                start = time.time()
-                log = []
-                while bytesSent < fileSize:
+            #with open(filename, 'rb') as inFile:
+            inFile = open(filename, 'rb')
+            start = time.time()
+            log = []
+            while bytesSent < fileSize:
+                
+                bytesRead = inFile.read(self.SIZE)
+                self.client.send(bytesRead)
+                delta = time.time() - start
+                
+                if int(delta) % 2 == 0:
                     progress["value"] = (bytesSent/fileSize)*100
+                    self.window.update()
 
-                    bytesRead = inFile.read(self.SIZE)
-                    self.client.send(bytesRead)
-                    delta = time.time() - start
-                    
-                    bps = (bytesSent*8)/delta
-                    temp = {}
-                    temp["bps"] = str(bps)
-                    temp["time"] = delta
-                    log.append(temp)
+                bps = int((bytesSent*8)/delta)
+                temp = {}
+                temp["bps"] = str(bps)
+                temp["time"] = delta
+                log.append(temp)
 
-                    speedVal.set(value=f"Downloading\nat\n{bps} bps")
-                    
-                    bytesSent += len(bytesRead)
+                if bps // 2**20 > 0:
+                    displayBPS = str(bps//2**20)+" Mbps"
+                elif bps // 2**10 > 0:
+                    displayBPS = str(bps//2**10)+" kbps"
+                else:
+                    displayBPS = str(bps)+" bps"
+
+
+                speedVal.set(value=f"Uploading\nat\n{displayBPS}")
+                
+                bytesSent += len(bytesRead)
+            inFile.close()
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             
             with open("clientUploadLog.csv", "a") as outFile:

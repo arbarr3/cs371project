@@ -242,7 +242,7 @@ class ClientThread(threading.Thread):
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[0] in dirsAndFiles["files"]:
                         bytesSent = 0
-                        fileSize = os.path.getsize(args[0])
+                        fileSize = os.path.getsize(os.path.join(currentDir, args[0]))
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
                         with open(os.path.join(currentDir, args[0]), 'rb') as inFile:
                             start = time.time()
@@ -260,7 +260,7 @@ class ClientThread(threading.Thread):
 
                                 bytesSent += len(bytesRead)
                         with open(os.path.join(_location_,"serverDownloadLog.csv"), 'a') as outFile:
-                            outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
+                            outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{args[0]},{fileSize}\n")
                             for i in log[1:]:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
 
