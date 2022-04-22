@@ -65,22 +65,20 @@ def main():
         if cmd == "TASK":
             client.send(cmd.encode(FORMAT))
         elif "UPLOAD@" in cmd:
-            filename = "Test.jpg"
+            #filename = "Test.jpg"
+            filename = "371Test.txt"
             filesize = os.path.getsize(filename)
             cmd += filename + "@" + str(filesize)
-            client.send(cmd.encode(FORMAT))
+            client.sendall(cmd.encode(FORMAT))
             
             print("> Sending " + filename + " of size " + str(filesize) + " bytes")
-
-            #progressBar = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
             bytes_sent = 0
 
             f = open(filename, "rb")
             while bytes_sent < filesize:
                 bytes_read = f.read(SIZE)
                 client.send(bytes_read)
-                bytes_sent += sys.getsizeof(bytes_read)
-                #print(bytes_sent)
+                bytes_sent += len(bytes_read)
             f.close()
 
         elif "DELFILE@" in cmd:
