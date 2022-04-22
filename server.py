@@ -113,7 +113,7 @@ class ClientThread(threading.Thread):
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
                     self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful                    
-                    self.sock.send("OK@Welcome to the server".encode(FORMAT))
+                    #self.sock.send("OK@Welcome to the server".encode(FORMAT))
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
                         os.mkdir(currentDir)                                    # make one
@@ -206,8 +206,9 @@ class ClientThread(threading.Thread):
                     filesize = int(args.pop())
                     filename = args.pop()
 
-                    filepath = os.path.join(os.getcwd(), "bar")
-                    filepath = os.path.join(filepath, filename)
+                    #filepath = os.path.join(os.getcwd(), "bar")
+                    #filepath = os.path.join(filepath, filename)
+                    filepath = os.path.join(currentDir, filename)
                     print(" > Attempting to upload " + filename + " to " + filepath)
 
                     bytes_received = 0      # Compared to the filesze to determine when transmission is complete
@@ -234,9 +235,36 @@ class ClientThread(threading.Thread):
                 #   Command:    DOWNLOAD
                 #   Args   :    [filename]
                 #   Purpose:    Server sends the specified file to the current working directory of the client
-                #   Status :    TODO
+                #   Status :    75% TODO - Needs testing.
                 #-----------------------------------------------------------------------------
+                elif cmd == "DOWNLOAD":
+                    dirsAndFiles = self.getDirectory(currentDir)
+                    if args[0] in dirsAndFiles["files"]:
+                        bytesSent = 0
+                        fileSize = os.path.getsize(args[0])
+                        self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
+                        with open(os.path.join(currentDir, args[0]), 'rb') as inFile:
+                            start = time.time()
+                            log = []
+                            while bytesSent < fileSize:
+                                bytesRead = inFile.read(SIZE)
+                                self.sock.send(bytesRead)
+                                
+                                delta = time.time() - start
+                                bps = (bytesSent*8)/delta
+                                temp = {}
+                                temp["bps"] = str(bps)
+                                temp["time"] = delta
+                                log.append(temp)
 
+                                bytesSent += len(bytesRead)
+                        with open(os.path.join(_location_,"serverDownloadLog.csv"), 'a') as outFile:
+                            outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
+                            for i in log[1:]:
+                                outFile.write(f"{i['time']},{i['bps']}\n")
+
+                    else:
+                        self.sock.send(f"FAIL@Could not find file: {args[0]}".encode(FORMAT))
                 #-----------------------------------------------------------------------------
                 #   Command:    DELFILE
                 #   Args   :    [filename]

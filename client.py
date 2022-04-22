@@ -1,8 +1,10 @@
+import os
 import tkinter as tk
-from tkinter import SUNKEN, ttk
+from tkinter import SUNKEN, ttk, filedialog
 from tkinter import StringVar
 import socket
 import pickle
+import time
 
 
 class UIClickable(tk.Canvas):
@@ -162,9 +164,88 @@ class GUIWindow:
                 print(data)
         else:
             print(f"trying to download {file}")
+            outFile = filedialog.asksaveasfile(initialfile=file, mode="wb")
+            
+            self.client.send(f"DOWNLOAD@{file}".encode(self.FORMAT))
+            data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            if "SUCCESS" in data:
+                bytesReceived = 0
+                fileSize = int(data.split("@")[1])
+                start = time.time()
+                log = []
+                print(f"filesize: {fileSize}")
+                # while bytesReceived < fileSize:
+                #     bytesRead = self.client.recv(self.SIZE)
+                    
+                #     delta = time.time() - start
+                #     bps = (bytesRead * 8)/delta
+                #     temp = {}
+                #     temp["bps"] = bps
+                #     temp["time"] = delta
+                #     log.append(temp)
+
+                #     outFile.write(bytesRead)
+                #     bytesReceived += len(bytesRead)
+
+
+            else:
+                print(data) # TODO Notify the user that this failed and why
+            outFile.close()
+
 
     def uploadFile(self):
-        print("upload some shit bro")
+        filename = filedialog.askopenfilename()
+        if filename != "":
+            fileSize = os.path.getsize(filename)
+            baseFilename = os.path.basename(filename)
+            self.client.send(f"UPLOAD@{baseFilename}@{fileSize}".encode(self.FORMAT))
+            bytesSent = 0
+
+            fileFrame = tk.Frame(self.dirsAndFilesFrame, height=90, width=90)
+            fileFrame.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
+            self.dirsAndFilesRow += 1
+
+            speedVal = tk.StringVar(value="Downloading\nat\n0 bps")
+            uploadSpeed = tk.Label(fileFrame, textvariable=speedVal)
+            uploadSpeed.grid(row=0, column=0, sticky="n")
+            progress = ttk.Progressbar(fileFrame, length=90)
+            progress.grid(row=1, column=0, padx=5, pady=25, sticky="s")          
+            
+            progressLabel = tk.Label(self.dirsAndFilesFrame, text=filename.split("/")[-1])
+            progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
+            
+            with open(filename, 'rb') as inFile:
+                start = time.time()
+                log = []
+                while bytesSent < fileSize:
+                    progress["value"] = (bytesSent/fileSize)*100
+
+                    bytesRead = inFile.read(self.SIZE)
+                    self.client.send(bytesRead)
+                    delta = time.time() - start
+                    
+                    bps = (bytesSent*8)/delta
+                    temp = {}
+                    temp["bps"] = str(bps)
+                    temp["time"] = delta
+                    log.append(temp)
+
+                    speedVal.set(value=f"Downloading\nat\n{bps} bps")
+                    
+                    bytesSent += len(bytesRead)
+            data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            
+            with open("clientUploadLog.csv", "a") as outFile:
+                outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
+                for i in log[1:]:
+                    outFile.write(f"{i['time']},{i['bps']}\n")
+            
+            if "OK" in data:
+                fileFrame.destroy()
+                progressLabel.destroy()
+                self.updateDirectory()
+
+         
 
     def updateDirectory(self):
         self.client.send("GETDIR".encode(self.FORMAT))
