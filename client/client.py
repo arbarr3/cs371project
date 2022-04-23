@@ -69,6 +69,7 @@ class GUIWindow:
     SIZE = 1024
     FORMAT = 'utf-8'
     STDGEO = "800x600"
+    cwd = os.getcwd()
     
     def __init__(self, rootWindow, clientSocket:socket):
         self.rootWindow = rootWindow
@@ -77,13 +78,13 @@ class GUIWindow:
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         self.window.bind("<Return>", lambda e: self.window.focus_force())
         self.client = clientSocket
-        self.folderImage = tk.PhotoImage(file="images/folder.png")
-        self.fileImage = tk.PhotoImage(file="images/file.png")
-        self.uploadImage = tk.PhotoImage(file="images/upload.png")
-        self.downloadImage = tk.PhotoImage(file="images/download.png")
-        self.newFolderImage = tk.PhotoImage(file="images/newFolder.png")
-        self.deleteImage = tk.PhotoImage(file="images/delete.png")
-        self.infoImage = tk.PhotoImage(file="images/info.png")
+        self.folderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "folder.png"))
+        self.fileImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "file.png"))
+        self.uploadImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "upload.png"))
+        self.downloadImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "download.png"))
+        self.newFolderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "newFolder.png"))
+        self.deleteImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "delete.png"))
+        self.infoImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "info.png"))
         self.dirButtons = {}
         self.dirLabels = {}
         self.dirLabelText = {}
@@ -228,6 +229,7 @@ class GUIWindow:
                     figure = plt.Figure(figsize=(6,5), dpi=100)
                     ax = figure.add_subplot()
                     ax.plot(xVals,yVals, 'r')
+                    
                     chartType = FigureCanvasTkAgg(figure, master=popup)
                     chartType.draw()
                     chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
