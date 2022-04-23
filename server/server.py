@@ -44,6 +44,10 @@ _userfiles_ = os.path.join(_location_, "users")
 if not os.path.isdir(_userfiles_):
     os.mkdir(_userfiles_)
 
+_sharedfiles_ = os.path.join(_location_, "shared")
+if not os.path.isdir(_sharedfiles_):
+    os.mkdir(_sharedfiles_)
+
 _users_ = os.path.join(_location_, "users.json")
 
 filesPath = os.path.join(_location_, "files.json")
@@ -161,7 +165,7 @@ class ClientThread(threading.Thread):
                 #-----------------------------------------------------------------------------
                 if cmd == "GETDIR":
                     dirContent = self.getDirectory(currentDir)
-                    if currentDir != os.path.join(_userfiles_, user):
+                    if currentDir != os.path.join(_userfiles_, user) and currentDir != _sharedfiles_:
                         dirContent["dirs"].insert(0,"..")
                     print(f"sending: {dirContent}")
                     send_data = pickle.dumps(dirContent)
@@ -185,6 +189,12 @@ class ClientThread(threading.Thread):
                             if currentDir != os.path.join(_userfiles_, user):
                                 dirContent["dirs"].insert(0,"..")
                             self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                    elif args[0] == "home":
+                        currentDir = os.path.join(_userfiles_, user)
+                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                    elif args[0] == "shared":
+                        currentDir = _sharedfiles_
+                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
                     elif args[0] in navigableDirs:
                         currentDir = os.path.join(currentDir, args[0])
                         self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))

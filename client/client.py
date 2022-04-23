@@ -78,6 +78,8 @@ class GUIWindow:
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         self.window.bind("<Return>", lambda e: self.window.focus_force())
         self.client = clientSocket
+        self.homeFolderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "home.png"))
+        self.sharedFolderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "sharedFolder.png"))
         self.folderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "folder.png"))
         self.fileImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "file.png"))
         self.uploadImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "upload.png"))
@@ -112,6 +114,12 @@ class GUIWindow:
         buttonDescription = tk.Message(menuFrame, textvariable=buttonDescriptionString)
         buttonDescription.configure(width=300)
 
+        homeFolderButton = UIClickable(menuFrame, 36, 34, image=self.homeFolderImage, clickFun=self.goHome, description=buttonDescriptionString, descriptionText="Home")
+        homeFolderButton.grid(row=localRow, column=localCol, sticky="w")
+        localCol += 1
+        sharedFolderButton = UIClickable(menuFrame, 36, 34, image=self.sharedFolderImage, clickFun=self.goShared, description=buttonDescriptionString, descriptionText="Shared Folder")
+        sharedFolderButton.grid(row=localRow, column=localCol, sticky="w")
+        localCol += 1
         newFolder = UIClickable(menuFrame, 36, 34, image=self.newFolderImage, clickFun=self.makeNewFolder, description=buttonDescriptionString, descriptionText="New Folder")
         newFolder.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
@@ -131,15 +139,25 @@ class GUIWindow:
         self.deleteButton.grid(row=self.gridRow, column=self.gridColumn, sticky="e", padx=10, pady=5)
         self.gridRow += 1
         self.gridColumn = 0
-        
-        
-        
+                
         menuBarFrame = tk.Frame(self.window)
         menuBarFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
         bar = tk.Canvas(menuBarFrame, height=6, width=800)
         bar.grid(row=0, column=0, sticky="nw", columnspan=2)
         bar.create_line(5,5,790,5)
         self.gridRow += 1
+    
+    def goHome(self):
+        self.client.send(f"CHANGEDIR@home".encode(self.FORMAT))
+        data = self.client.recv(self.SIZE).decode(self.FORMAT)
+        if "SUCCESS" in data:
+            self.updateDirectory()
+    
+    def goShared(self):
+        self.client.send(f"CHANGEDIR@shared".encode(self.FORMAT))
+        data = self.client.recv(self.SIZE).decode(self.FORMAT)
+        if "SUCCESS" in data:
+            self.updateDirectory()
 
     def downloadFile(self):
         self.downloadButton.toggle()
@@ -519,8 +537,6 @@ class ConnectionWindow:
         self.rootWindow.destroy()
 
 window = tk.Tk()
-style = ttk.Style(window)
-style.theme_use('clam')
 window.title("CS371 Client")
 window.withdraw()
 cW = ConnectionWindow(window)
