@@ -304,13 +304,13 @@ class GUIWindow:
             progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             
             with open(filename, 'rb') as inFile:
-                start = time.time()
+                start = time.perf_counter()
                 log = []
                 while bytesSent < fileSize:
                     
                     bytesRead = inFile.read(self.SIZE)
                     self.client.send(bytesRead)
-                    delta = time.time() - start
+                    delta =time.perf_counter() - start
                     
                     if int(delta) % 2 == 0:
                         progress["value"] = (bytesSent/fileSize)*100

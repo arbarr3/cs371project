@@ -55,9 +55,8 @@ else:
         json.dump({}, outFile)
     _fileDownloads_ = {}
 
-_serverFiles_ = os.path.realpath(os.path.join(_location_, ".server"))
-_downloadFiles_ = os.path.realpath(os.path.join(_serverFiles_, "Download"))
-_upFiles_ = os.path.realpath(os.path.join(_serverFiles_, "Upload"))
+_downloadFiles_ = os.path.realpath(os.path.join(_location_, "downloadLogs"))
+_upFiles_ = os.path.realpath(os.path.join(_location_, "uploadLogs"))
 
 #============================= Global Variables ===============================
 # 
