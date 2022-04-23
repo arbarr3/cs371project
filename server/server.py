@@ -258,10 +258,13 @@ class ClientThread(threading.Thread):
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[0] in dirsAndFiles["files"]:
                         filepath = os.path.join(currentDir, args[0])
+                        baseFilename = os.path.basename(filename)
+                        
                         if filepath in _fileDownloads_.keys():
                             _fileDownloads_[filepath] += 1
                         else:
                             _fileDownloads_[filepath] = 1
+                        
                         bytesSent = 0
                         fileSize = os.path.getsize(filepath)
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
