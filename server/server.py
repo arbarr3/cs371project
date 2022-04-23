@@ -253,7 +253,7 @@ class ClientThread(threading.Thread):
 
                     send_data = "OK@File " + filename + " was transferred"
                     self.sock.send(send_data.encode(FORMAT))
-                    self.makeGraph(transferRows, filename, True)  # True denotes uploaded file
+                    #self.makeGraph(transferRows, filename, True)  # True denotes uploaded file
 
                 #-----------------------------------------------------------------------------
                 #   Command:    DOWNLOAD

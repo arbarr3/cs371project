@@ -1,4 +1,3 @@
-from ctypes import alignment
 import os
 import tkinter as tk
 from tkinter import SUNKEN, ttk, filedialog
@@ -96,10 +95,6 @@ class GUIWindow:
         self.gridColumn = 0
         self.gridRow = 0
 
-        self.downloadMode = False
-        self.deleteMode = False
-        self.infoMode = False
-
         self.buildMenubar()
         self.updateDirectory()
     
@@ -126,16 +121,16 @@ class GUIWindow:
         uploadButton = UIClickable(menuFrame, 36, 34, image=self.uploadImage, clickFun=self.uploadFile, description=buttonDescriptionString, descriptionText="Upload File")
         uploadButton.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
-        self.infoButton = UIClickable(menuFrame, 36, 34, image=self.infoImage, clickFun=self.getInfo, description=buttonDescriptionString, descriptionText="File Info", toggleBorderColor="blue")
+        self.infoButton = UIClickable(menuFrame, 36, 34, image=self.infoImage, clickFun=self.toggleGetInfo, description=buttonDescriptionString, descriptionText="File Info", toggleBorderColor="blue")
         self.infoButton.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
-        self.downloadButton = UIClickable(menuFrame, 36, 34, image=self.downloadImage, clickFun=self.downloadFile, description=buttonDescriptionString, descriptionText="Download File", toggleBorderColor="green")
+        self.downloadButton = UIClickable(menuFrame, 36, 34, image=self.downloadImage, clickFun=self.toggleDownloadFile, description=buttonDescriptionString, descriptionText="Download File", toggleBorderColor="green")
         self.downloadButton.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
         
         buttonDescription.grid(row=localRow, column=localCol, sticky="w")
         
-        self.deleteButton = UIClickable(self.window, 36, 34, image=self.deleteImage, clickFun=self.deleteObject, description=buttonDescriptionString, descriptionText="Delete")
+        self.deleteButton = UIClickable(self.window, 36, 34, image=self.deleteImage, clickFun=self.toggleDeleteObject, description=buttonDescriptionString, descriptionText="Delete")
         self.deleteButton.grid(row=self.gridRow, column=self.gridColumn, sticky="e", padx=10, pady=5)
         self.gridRow += 1
         self.gridColumn = 0
@@ -159,17 +154,23 @@ class GUIWindow:
         if "SUCCESS" in data:
             self.updateDirectory()
 
-    def downloadFile(self):
+    def toggleDownloadFile(self):
+        self.untoggleAllExcept(self.downloadButton)
         self.downloadButton.toggle()
-        self.downloadMode = self.downloadButton.toggled
     
-    def deleteObject(self):
+    def toggleDeleteObject(self):
+        self.untoggleAllExcept(self.deleteButton)
         self.deleteButton.toggle()
-        self.deleteMode = self.deleteButton.toggled
     
-    def getInfo(self):
+    def toggleGetInfo(self):
+        self.untoggleAllExcept(self.infoButton)
         self.infoButton.toggle()
-        self.infoMode = self.infoButton.toggled
+
+    def untoggleAllExcept(self, exceptMe):
+        # Dirty, I know.
+        for b in [self.downloadButton, self.deleteButton, self.infoButton]:
+            if b is not exceptMe and b.toggled:
+                b.toggle()
 
     def makeNewFolder(self):
         makeFolderCallback = self.window.register(self.sendNewFolder)
@@ -201,7 +202,7 @@ class GUIWindow:
         return False
 
     def fileButtonInteraction(self, file):
-        if self.deleteMode:
+        if self.deleteButton.toggled:
             self.client.send(f"DELETE@{file}".encode(self.FORMAT))
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             if "SUCCESS" in data:
@@ -209,7 +210,7 @@ class GUIWindow:
             else:
                 print(data) # TODO Handle this better
         
-        elif self.infoMode:
+        elif self.infoButton.toggled:
             self.client.send(f"INFO@{file}".encode(self.FORMAT))
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             epochTime, fileSize, downloads = data.split("@")[1:]
@@ -256,45 +257,47 @@ class GUIWindow:
                     chartType.draw()
                     chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
                     lrow += 1
-                    
 
-        elif self.downloadMode:
+        elif self.downloadButton.toggled:
             outFile = filedialog.asksaveasfile(initialfile=file, mode="wb")
-            
-            self.client.send(f"DOWNLOAD@{file}".encode(self.FORMAT))
-            data = self.client.recv(self.SIZE).decode(self.FORMAT)
-            
-            log = []
-            if "SUCCESS" in data:
-                bytesReceived = 0
-                fileSize = int(data.split("@")[1])
-                start = time.perf_counter()
-
-                while bytesReceived < fileSize:
+            if outFile is not None:
+                self.client.send(f"DOWNLOAD@{file}".encode(self.FORMAT))
+                data = self.client.recv(self.SIZE).decode(self.FORMAT)
+                
+                log = []
+                if "SUCCESS" in data:
+                    bytesReceived = 0
+                    fileSize = int(data.split("@")[1])
                     
-                    bytesRead = self.client.recv(self.SIZE)
-                    delta = time.perf_counter() - start
-                    
-                    bps = len(bytesRead)/delta
-                    temp = {}
-                    temp["bps"] = bps
-                    temp["time"] = delta
-                    log.append(temp)
+                    downloadsFrame = tk.Frame(self.window, height=32, width=self.window.winfo_width())
+                    downloadsFrame.grid(row=self.gridRow, column=self.gridColumn, bgcolor="red")
 
-                    outFile.write(bytesRead)
-                    bytesReceived += len(bytesRead)
 
-            else:
-                print(data) # TODO Notify the user that this failed and why
+                    start = time.perf_counter()
+                    while bytesReceived < fileSize:
+                        
+                        bytesRead = self.client.recv(self.SIZE)
+                        delta = time.perf_counter() - start
+                        
+                        bps = len(bytesRead)/delta
+                        temp = {}
+                        temp["bps"] = bps
+                        temp["time"] = delta
+                        log.append(temp)
+
+                        outFile.write(bytesRead)
+                        bytesReceived += len(bytesRead)
+
+                else:
+                    print(data) # TODO Notify the user that this failed and why
+                    outFile.close()
+                    return
                 outFile.close()
-                return
-            outFile.close()
 
-            with open(f"./downloadLogs/{file}.csv", "w") as outFile:
-                outFile.write("Time,Bytes Per Second\n")
-                for i in log:
-                    outFile.write(f"{i['time']},{i['bps']}\n")
-
+                with open(f"./downloadLogs/{file}.csv", "w") as outFile:
+                    outFile.write("Time,Bytes Per Second\n")
+                    for i in log:
+                        outFile.write(f"{i['time']},{i['bps']}\n")
         else:
             print("Do something here")
 
