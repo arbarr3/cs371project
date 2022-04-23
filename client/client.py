@@ -77,13 +77,13 @@ class GUIWindow:
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         self.window.bind("<Return>", lambda e: self.window.focus_force())
         self.client = clientSocket
-        self.folderImage = tk.PhotoImage(file="./images/folder.png")
-        self.fileImage = tk.PhotoImage(file="./images/file.png")
-        self.uploadImage = tk.PhotoImage(file="./images/upload.png")
-        self.downloadImage = tk.PhotoImage(file="./images/download.png")
-        self.newFolderImage = tk.PhotoImage(file="./images/newFolder.png")
-        self.deleteImage = tk.PhotoImage(file="./images/delete.png")
-        self.infoImage = tk.PhotoImage(file="./images/info.png")
+        self.folderImage = tk.PhotoImage(file="images/folder.png")
+        self.fileImage = tk.PhotoImage(file="images/file.png")
+        self.uploadImage = tk.PhotoImage(file="images/upload.png")
+        self.downloadImage = tk.PhotoImage(file="images/download.png")
+        self.newFolderImage = tk.PhotoImage(file="images/newFolder.png")
+        self.deleteImage = tk.PhotoImage(file="images/delete.png")
+        self.infoImage = tk.PhotoImage(file="images/info.png")
         self.dirButtons = {}
         self.dirLabels = {}
         self.dirLabelText = {}
