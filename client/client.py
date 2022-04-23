@@ -25,7 +25,6 @@ class UIClickable(tk.Canvas):
         toggleBorderColor = "red"
         ):
         tk.Canvas.__init__(self, window, width=width, height=height)
-
         self.clickFun = clickFun
         self.hoverFun = hoverFun
         self.description = description
@@ -269,8 +268,9 @@ class GUIWindow:
                     bytesReceived = 0
                     fileSize = int(data.split("@")[1])
                     
-                    downloadsFrame = tk.Frame(self.window, height=32, width=self.window.winfo_width())
-                    downloadsFrame.grid(row=self.gridRow, column=self.gridColumn, bgcolor="red")
+                    downloadsFrame = tk.Frame(self.window, height=46, width=self.window.winfo_width())
+                    downloadsFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="s")
+                    downloadsFrame.config(bg="red")
 
 
                     start = time.perf_counter()
@@ -383,7 +383,7 @@ class GUIWindow:
 
         print(f"received: {dirsAndFiles}")
         self.dirsAndFilesFrame = tk.Frame(self.window)
-        self.dirsAndFilesFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw", columnspan=2)
+        self.dirsAndFilesFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nsew", columnspan=2)
         self.dirsAndFilesRow = 0
         self.dirsAndFilesCol = 0
         
@@ -393,7 +393,7 @@ class GUIWindow:
             self.dirButtons[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
             self.dirsAndFilesRow += 1
             self.dirLabelText[dir] = tk.StringVar(value=dir)
-            self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+            self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED, disabledbackground="white")
             self.dirLabels[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
             self.dirLabels[dir].bind("<Button-1>", lambda e, f=dir: self.changeDirname(e,f))
             self.dirLabels[dir].config(validate="focusout", validatecommand=(renameEntryCallback, "%s", dir))
@@ -409,7 +409,7 @@ class GUIWindow:
             self.fileButtons[file].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
             self.dirsAndFilesRow += 1
             self.fileLabelText[file] = tk.StringVar(value=file)
-            self.fileLabels[file] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+            self.fileLabels[file] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.fileLabelText[file], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED, disabledbackground="white")
             self.fileLabels[file].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
             self.fileLabels[file].bind("<Button-1>", lambda e, f=file: self.changeFilename(e,f))
             self.fileLabels[file].config(validate="focusout", validatecommand=(renameEntryCallback, "%s", file))
@@ -455,7 +455,7 @@ class GUIWindow:
         self.rootWindow.destroy()
     
     def navigateTo(self, dir):
-        if self.deleteMode and dir != "..":
+        if self.deleteButton.toggled and dir != "..":
             self.client.send(f"DELETE@{dir}".encode(self.FORMAT))
         else:
             print(f"trying to navigate to {dir}")
@@ -533,6 +533,7 @@ class ConnectionWindow:
         self.rootWindow.destroy()
 
 window = tk.Tk()
+window.tk_setPalette(background="white")
 window.title("CS371 Client")
 window.withdraw()
 cW = ConnectionWindow(window)

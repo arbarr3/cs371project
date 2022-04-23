@@ -265,7 +265,7 @@ class ClientThread(threading.Thread):
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[0] in dirsAndFiles["files"]:
                         filepath = os.path.join(currentDir, args[0])
-                        baseFilename = os.path.basename(filename)
+                        baseFilename = os.path.basename(args[0])
                         
                         if filepath in _fileDownloads_.keys():
                             _fileDownloads_[filepath] += 1
