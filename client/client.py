@@ -228,8 +228,12 @@ class GUIWindow:
                             
                     figure = plt.Figure(figsize=(6,5), dpi=100)
                     ax = figure.add_subplot()
+                    ax.clear()
                     ax.plot(xVals,yVals, 'r')
-                    
+                    title = f"Upload Transfer Rate" if "upload" in path else "Download Transfer Rate"
+                    ax.set_title(title)
+                    ax.set_xlabel("Time (seconds)")
+                    ax.set_ylabel("Transfer Rate (bits/second)")
                     chartType = FigureCanvasTkAgg(figure, master=popup)
                     chartType.draw()
                     chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
@@ -304,13 +308,13 @@ class GUIWindow:
             progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             
             with open(filename, 'rb') as inFile:
-                start = time.time()
+                start = time.perf_counter()
                 log = []
                 while bytesSent < fileSize:
                     
                     bytesRead = inFile.read(self.SIZE)
                     self.client.send(bytesRead)
-                    delta = time.time() - start
+                    delta = time.perf_counter() - start
                     
                     if int(delta) % 2 == 0:
                         progress["value"] = (bytesSent/fileSize)*100
