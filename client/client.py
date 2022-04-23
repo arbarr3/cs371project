@@ -1,3 +1,4 @@
+from ctypes import alignment
 import os
 import tkinter as tk
 from tkinter import SUNKEN, ttk, filedialog
@@ -5,6 +6,8 @@ from tkinter import StringVar
 import socket
 import pickle
 import time
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class UIClickable(tk.Canvas):
@@ -77,8 +80,10 @@ class GUIWindow:
         self.folderImage = tk.PhotoImage(file="./images/folder.png")
         self.fileImage = tk.PhotoImage(file="./images/file.png")
         self.uploadImage = tk.PhotoImage(file="./images/upload.png")
+        self.downloadImage = tk.PhotoImage(file="./images/download.png")
         self.newFolderImage = tk.PhotoImage(file="./images/newFolder.png")
         self.deleteImage = tk.PhotoImage(file="./images/delete.png")
+        self.infoImage = tk.PhotoImage(file="./images/info.png")
         self.dirButtons = {}
         self.dirLabels = {}
         self.dirLabelText = {}
@@ -87,7 +92,10 @@ class GUIWindow:
         self.fileLabelText = {}
         self.gridColumn = 0
         self.gridRow = 0
+
+        self.downloadMode = False
         self.deleteMode = False
+        self.infoMode = False
 
         self.buildMenubar()
         self.updateDirectory()
@@ -96,31 +104,53 @@ class GUIWindow:
         localRow = 0
         localCol = 0
         menuFrame = tk.Frame(self.window)
-        menuFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
-        self.gridRow += 1
+        menuFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw", pady=5)
+        
 
         buttonDescriptionString = tk.StringVar()
         buttonDescription = tk.Message(menuFrame, textvariable=buttonDescriptionString)
         buttonDescription.configure(width=300)
 
         newFolder = UIClickable(menuFrame, 36, 34, image=self.newFolderImage, clickFun=self.makeNewFolder, description=buttonDescriptionString, descriptionText="New Folder")
-        newFolder.grid(row=localRow, column=localCol, sticky="nw")
-        localCol += 1
-        self.deleteButton = UIClickable(menuFrame, 36, 34, image=self.deleteImage, clickFun=self.deleteObject, description=buttonDescriptionString, descriptionText="Delete")
-        self.deleteButton.grid(row=localRow, column=localCol, sticky="nw")
+        newFolder.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
         uploadButton = UIClickable(menuFrame, 36, 34, image=self.uploadImage, clickFun=self.uploadFile, description=buttonDescriptionString, descriptionText="Upload File")
-        uploadButton.grid(row=localRow, column=localCol, sticky="nw")
+        uploadButton.grid(row=localRow, column=localCol, sticky="w")
+        localCol += 1
+        self.infoButton = UIClickable(menuFrame, 36, 34, image=self.infoImage, clickFun=self.getInfo, description=buttonDescriptionString, descriptionText="File Info", toggleBorderColor="blue")
+        self.infoButton.grid(row=localRow, column=localCol, sticky="w")
+        localCol += 1
+        self.downloadButton = UIClickable(menuFrame, 36, 34, image=self.downloadImage, clickFun=self.downloadFile, description=buttonDescriptionString, descriptionText="Download File", toggleBorderColor="green")
+        self.downloadButton.grid(row=localRow, column=localCol, sticky="w")
         localCol += 1
         
         buttonDescription.grid(row=localRow, column=localCol, sticky="w")
         
+        self.deleteButton = UIClickable(self.window, 36, 34, image=self.deleteImage, clickFun=self.deleteObject, description=buttonDescriptionString, descriptionText="Delete")
+        self.deleteButton.grid(row=self.gridRow, column=self.gridColumn, sticky="e", padx=10, pady=5)
+        self.gridRow += 1
+        self.gridColumn = 0
+        
+        
+        
         menuBarFrame = tk.Frame(self.window)
         menuBarFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
         bar = tk.Canvas(menuBarFrame, height=6, width=800)
-        bar.grid(row=localRow, column=localCol, sticky="nw")
+        bar.grid(row=0, column=0, sticky="nw", columnspan=2)
         bar.create_line(5,5,790,5)
         self.gridRow += 1
+
+    def downloadFile(self):
+        self.downloadButton.toggle()
+        self.downloadMode = self.downloadButton.toggled
+    
+    def deleteObject(self):
+        self.deleteButton.toggle()
+        self.deleteMode = self.deleteButton.toggled
+    
+    def getInfo(self):
+        self.infoButton.toggle()
+        self.infoMode = self.infoButton.toggled
 
     def makeNewFolder(self):
         makeFolderCallback = self.window.register(self.sendNewFolder)
@@ -129,16 +159,13 @@ class GUIWindow:
         self.dirButtons[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
         self.dirsAndFilesRow += 1
         self.dirLabelText[dir] = tk.StringVar(value="New Folder")
-        self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT, state=tk.DISABLED)
+        self.dirLabels[dir] = tk.Entry(self.dirsAndFilesFrame, width=9, textvariable=self.dirLabelText[dir], readonlybackground="white", disabledforeground="black", relief=tk.FLAT)
         self.dirLabels[dir].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5)
         self.dirLabels[dir].bind("<Button-1>", lambda e, f=dir: self.changeDirname(e,f))
         self.dirLabels[dir].config(validate="focusout", validatecommand=(makeFolderCallback, "%s", dir))
         self.dirLabels[dir].focus_set()
+        self.dirLabels[dir].select_range(0, tk.END)
         self.dirsAndFilesRow -= 1
-    
-    def deleteObject(self):
-        self.deleteButton.toggle()
-        self.deleteMode = self.deleteButton.toggled
 
     def sendNewFolder(self, folderName, dir):
         if folderName != dir:
@@ -154,30 +181,81 @@ class GUIWindow:
             self.dirLabels[dir].destroy()
         return False
 
-    def downloadFile(self, file):
+    def fileButtonInteraction(self, file):
         if self.deleteMode:
             self.client.send(f"DELETE@{file}".encode(self.FORMAT))
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             if "SUCCESS" in data:
                 self.updateDirectory()
             else:
-                print(data)
-        else:
-            print(f"trying to download {file}")
+                print(data) # TODO Handle this better
+        
+        elif self.infoMode:
+            self.client.send(f"INFO@{file}".encode(self.FORMAT))
+            data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            epochTime, fileSize, downloads = data.split("@")[1:]
+            
+            popup = tk.Toplevel(self.window)
+            popup.title(f"{file} Info")
+
+            timeLabel = tk.Label(popup, text="Created:")
+            timeLabel.grid(row=0, column=0, sticky="nw", padx=5, pady=2)
+            timeLabelValue = tk.Label(popup, text=time.ctime(float(epochTime)))
+            timeLabelValue.grid(row=0, column=1, sticky="nw", padx=5, pady=2)
+            sizeLabel = tk.Label(popup, text="File size:")
+            sizeLabel.grid(row=1, column=0, sticky="nw", padx=5, pady=2)
+            sizeLabelValue = tk.Label(popup, text=self.stringifyFileSize(int(fileSize),"B"))
+            sizeLabelValue.grid(row=1, column=1, sticky="nw", padx=5, pady=2)
+            downloadsLabel = tk.Label(popup, text="Downlods:")
+            downloadsLabel.grid(row=2, column=0, sticky="nw", padx=5, pady=2)
+            downloadsLabelValue = tk.Label(popup, text=downloads)
+            downloadsLabelValue.grid(row=2, column=1, sticky="nw", padx=5, pady=2)
+            
+            logpaths = [f"./uploadLogs/{file}.csv", f"./downloadLogs/{file}.csv"]
+            lrow = 3
+            lcol = 0
+            for path in logpaths:
+                if os.path.exists(path):
+                    xVals = []
+                    yVals = []
+                    with open(path, 'r') as inFile:
+                        trash = inFile.readline()
+                        for line in inFile:
+                            line = line.strip().split(',')
+                            xVals.append(float(line[0]))
+                            yVals.append(float(line[1]))
+                            
+                    figure = plt.Figure(figsize=(6,5), dpi=100)
+                    ax = figure.add_subplot()
+                    ax.plot(xVals,yVals, 'r')
+                    chartType = FigureCanvasTkAgg(figure, master=popup)
+                    chartType.draw()
+                    chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
+                    lrow += 1
+                    
+
+
+
+                
+
+        
+        elif self.downloadMode:
             outFile = filedialog.asksaveasfile(initialfile=file, mode="wb")
             
             self.client.send(f"DOWNLOAD@{file}".encode(self.FORMAT))
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
+            
+            log = []
             if "SUCCESS" in data:
                 bytesReceived = 0
                 fileSize = int(data.split("@")[1])
                 start = time.time()
-                log = []
-                print(f"filesize: {fileSize}")
+
                 while bytesReceived < fileSize:
-                    bytesRead = self.client.recv(self.SIZE)
                     
+                    bytesRead = self.client.recv(self.SIZE)
                     delta = time.time() - start
+                    
                     bps = (len(bytesRead) * 8)/delta
                     temp = {}
                     temp["bps"] = bps
@@ -187,10 +265,19 @@ class GUIWindow:
                     outFile.write(bytesRead)
                     bytesReceived += len(bytesRead)
 
-
             else:
                 print(data) # TODO Notify the user that this failed and why
+                outFile.close()
+                return
             outFile.close()
+
+            with open(f"./downloadLogs/{file}.csv", "w") as outFile:
+                outFile.write("Time,Bits Per Second\n")
+                for i in log:
+                    outFile.write(f"{i['time']},{i['bps']}\n")
+
+        else:
+            print("Do something here")
 
 
     def uploadFile(self):
@@ -214,43 +301,42 @@ class GUIWindow:
             progressLabel = tk.Label(self.dirsAndFilesFrame, text=filename.split("/")[-1])
             progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             
-            #with open(filename, 'rb') as inFile:
-            inFile = open(filename, 'rb')
-            start = time.time()
-            log = []
-            while bytesSent < fileSize:
-                
-                bytesRead = inFile.read(self.SIZE)
-                self.client.send(bytesRead)
-                delta = time.time() - start
-                
-                if int(delta) % 2 == 0:
-                    progress["value"] = (bytesSent/fileSize)*100
-                    self.window.update()
+            with open(filename, 'rb') as inFile:
+                start = time.time()
+                log = []
+                while bytesSent < fileSize:
+                    
+                    bytesRead = inFile.read(self.SIZE)
+                    self.client.send(bytesRead)
+                    delta = time.time() - start
+                    
+                    if int(delta) % 2 == 0:
+                        progress["value"] = (bytesSent/fileSize)*100
+                        self.window.update()
 
-                bps = int((bytesSent*8)/delta)
-                temp = {}
-                temp["bps"] = str(bps)
-                temp["time"] = delta
-                log.append(temp)
+                    bps = int((bytesSent*8)/delta)
+                    temp = {}
+                    temp["bps"] = str(bps)
+                    temp["time"] = delta
+                    log.append(temp)
 
-                if bps // 2**20 > 0:
-                    displayBPS = str(bps//2**20)+" Mbps"
-                elif bps // 2**10 > 0:
-                    displayBPS = str(bps//2**10)+" kbps"
-                else:
-                    displayBPS = str(bps)+" bps"
+                    displayBPS = self.stringifyFileSize(bps, "bps")
+                    # if bps // 2**20 > 0:
+                    #     displayBPS = str(bps//2**20)+" Mbps"
+                    # elif bps // 2**10 > 0:
+                    #     displayBPS = str(bps//2**10)+" kbps"
+                    # else:
+                    #     displayBPS = str(bps)+" bps"
 
 
-                speedVal.set(value=f"Uploading\nat\n{displayBPS}")
-                
-                bytesSent += len(bytesRead)
-            inFile.close()
+                    speedVal.set(value=f"Uploading\nat\n{displayBPS}")
+                    
+                    bytesSent += len(bytesRead)
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             
-            with open("clientUploadLog.csv", "a") as outFile:
-                outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
-                for i in log[1:]:
+            with open(f"./uploadLogs/{baseFilename}.csv", "w") as outFile:
+                outFile.write("Time,Bits Per Second\n")
+                for i in log:
                     outFile.write(f"{i['time']},{i['bps']}\n")
             
             if "OK" in data:
@@ -258,7 +344,13 @@ class GUIWindow:
                 progressLabel.destroy()
                 self.updateDirectory()
 
-         
+    def stringifyFileSize(self, value, units:str):
+        if value // 2**20 > 0:
+            return str(value//2**20)+" M"+units
+        elif value // 2**10 > 0:
+            return str(value//2**10)+" k"+units
+        else:
+            return str(value)+" "+units
 
     def updateDirectory(self):
         self.client.send("GETDIR".encode(self.FORMAT))
@@ -276,7 +368,7 @@ class GUIWindow:
 
         print(f"received: {dirsAndFiles}")
         self.dirsAndFilesFrame = tk.Frame(self.window)
-        self.dirsAndFilesFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw")
+        self.dirsAndFilesFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="nw", columnspan=2)
         self.dirsAndFilesRow = 0
         self.dirsAndFilesCol = 0
         
@@ -298,7 +390,7 @@ class GUIWindow:
                 self.dirsAndFilesRow += 2
 
         for file in dirsAndFiles["files"]:
-            self.fileButtons[file] = tk.Button(self.dirsAndFilesFrame, image=self.fileImage, command=lambda f = file: self.downloadFile(f))
+            self.fileButtons[file] = tk.Button(self.dirsAndFilesFrame, image=self.fileImage, command=lambda f = file: self.fileButtonInteraction(f))
             self.fileButtons[file].grid(column=self.dirsAndFilesCol, row=self.dirsAndFilesRow, padx=5, pady=5, sticky="nw")
             self.dirsAndFilesRow += 1
             self.fileLabelText[file] = tk.StringVar(value=file)
@@ -315,13 +407,15 @@ class GUIWindow:
 
     def changeFilename(self, e, file):
         self.fileLabels[file].configure(state=tk.NORMAL)
-        self.fileLabels[file].focus()
+        self.fileLabels[file].focus_set()
         self.fileLabels[file].select_range(0, tk.END)
+        self.window.update()
     
     def changeDirname(self, e, dir):
         self.dirLabels[dir].configure(state=tk.NORMAL)
-        self.dirLabels[dir].focus()
+        self.dirLabels[dir].focus_set()
         self.dirLabels[dir].select_range(0, tk.END)
+        self.window.update()
 
     def rename(self, newName, oldName):
         self.client.send(f"RENAME@{oldName}@{newName}".encode(self.FORMAT))
@@ -339,7 +433,10 @@ class GUIWindow:
             return False
 
     def dieGracefully(self):
-        self.client.send("LOGOUT".encode(self.FORMAT))
+        try:
+            self.client.send("LOGOUT".encode(self.FORMAT))
+        except:
+            print("Warning: Problem closing the connection.")
         self.rootWindow.destroy()
     
     def navigateTo(self, dir):
@@ -414,14 +511,11 @@ class ConnectionWindow:
                 print(f"Error: Unexpected response -> {data}")
     
     def dieGracefully(self):
-        if self.client is not None:
+        try:
             self.client.send("LOGOUT".encode(self.FORMAT))
+        except:
+            print("Warning: Problem closing the connection.")
         self.rootWindow.destroy()
-
-
-        
-
-
 
 window = tk.Tk()
 window.title("CS371 Client")
