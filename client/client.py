@@ -251,7 +251,7 @@ class GUIWindow:
                     title = f"Upload Transfer Rate" if "upload" in path else "Download Transfer Rate"
                     ax.set_title(title)
                     ax.set_xlabel("Time (seconds)")
-                    ax.set_ylabel("Transfer Rate (bits/second)")
+                    ax.set_ylabel("Transfer Rate (bytes/second)")
                     chartType = FigureCanvasTkAgg(figure, master=popup)
                     chartType.draw()
                     chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
@@ -275,7 +275,7 @@ class GUIWindow:
                     bytesRead = self.client.recv(self.SIZE)
                     delta = time.perf_counter() - start
                     
-                    bps = (len(bytesRead) * 8)/delta
+                    bps = len(bytesRead)/delta
                     temp = {}
                     temp["bps"] = bps
                     temp["time"] = delta
@@ -291,7 +291,7 @@ class GUIWindow:
             outFile.close()
 
             with open(f"./downloadLogs/{file}.csv", "w") as outFile:
-                outFile.write("Time,Bits Per Second\n")
+                outFile.write("Time,Bytes Per Second\n")
                 for i in log:
                     outFile.write(f"{i['time']},{i['bps']}\n")
 
@@ -311,7 +311,7 @@ class GUIWindow:
             fileFrame.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             self.dirsAndFilesRow += 1
 
-            speedVal = tk.StringVar(value="Uploading\nat\n0 bps")
+            speedVal = tk.StringVar(value="Uploading\nat\n0 Bps")
             uploadSpeed = tk.Label(fileFrame, textvariable=speedVal)
             uploadSpeed.grid(row=0, column=0, sticky="n")
             progress = ttk.Progressbar(fileFrame, length=90)
@@ -333,20 +333,13 @@ class GUIWindow:
                         progress["value"] = (bytesSent/fileSize)*100
                         self.window.update()
 
-                    bps = int((bytesSent*8)/delta)
+                    bps = int(bytesSent/delta)
                     temp = {}
                     temp["bps"] = str(bps)
                     temp["time"] = delta
                     log.append(temp)
 
-                    displayBPS = self.stringifyFileSize(bps, "bps")
-                    # if bps // 2**20 > 0:
-                    #     displayBPS = str(bps//2**20)+" Mbps"
-                    # elif bps // 2**10 > 0:
-                    #     displayBPS = str(bps//2**10)+" kbps"
-                    # else:
-                    #     displayBPS = str(bps)+" bps"
-
+                    displayBPS = self.stringifyFileSize(bps, "Bps")
 
                     speedVal.set(value=f"Uploading\nat\n{displayBPS}")
                     
@@ -354,7 +347,7 @@ class GUIWindow:
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
             
             with open(f"./uploadLogs/{baseFilename}.csv", "w") as outFile:
-                outFile.write("Time,Bits Per Second\n")
+                outFile.write("Time,Bytes Per Second\n")
                 for i in log:
                     outFile.write(f"{i['time']},{i['bps']}\n")
             
