@@ -266,13 +266,13 @@ class ClientThread(threading.Thread):
                         fileSize = os.path.getsize(filepath)
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
                         with open(filepath, 'rb') as inFile:
-                            start = time.time()
+                            start = time.perf_counter()
                             log = []
                             while bytesSent < fileSize:
                                 bytesRead = inFile.read(SIZE)
                                 self.sock.send(bytesRead)
                                 
-                                delta = time.time() - start
+                                delta = time.perf_counter() - start
                                 bps = (bytesSent*8)/delta
                                 temp = {}
                                 temp["bps"] = str(bps)
