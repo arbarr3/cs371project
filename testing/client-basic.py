@@ -12,6 +12,8 @@ import pickle
 
 
 IP = "localhost"
+#IP = "10.113.32.91"
+#IP = "10.113.32.63"
 #IP = "169.254.40.234"
 #IP = "10.113.32.57"
 PORT = 4450
@@ -45,10 +47,6 @@ def main():
                 response = client.recv(SIZE).decode(FORMAT)
                 if response == "ACCEPT":
                     auth = True
-                    data = client.recv(SIZE).decode(FORMAT)
-                    cmd, msg = data.split("@")
-                    if cmd == "OK":
-                        print(f"{msg}")
                 else:
                     print("Invalid, try again")
         elif cmd == "DISCONNECTED":
