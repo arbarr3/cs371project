@@ -221,8 +221,6 @@ class ClientThread(threading.Thread):
                     with open(os.path.join(_location_, "files.json"), 'w') as outFile:
                         json.dump(_fileDownloads_, outFile)
 
-                    transferRows = []    # List of lists to capture the row data for generating a CSV file of data transfer rates
-                    progressBar = tqdm.tqdm(range(filesize), f" > Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
                     bytesReceived = 0      # Compared to the filesze to determine when transmission is complete
                     transferRows = []      # List of lists to capture the row data for generating a CSV file of data transfer rates
 
