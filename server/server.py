@@ -10,22 +10,32 @@
 #==============================================================================
 
 from calendar import c
+from cmath import inf
 import csv
-import os
+import datetime
+import os               # Used for filepath referencing
 import sys
-import time               # Used for filepath referencing
+import time
+import warnings               
 import tqdm             # Used to display file transfer progess within terminal
 import shutil           # Used for deleting directories
 import socket           # Used to implement python socket networking functionality
 import threading        # Used to grant each client connection a seperate thread
 import pickle
 import json             # Used to access the user plain text file for authentication
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+warnings.filterwarnings( "ignore", module = "seaborn")  # Ignore seaborn warning regarding MatPlotLib running on multiple threads
 
 #============================= Private Variables ===============================
 # 
-#   _location_ :  (str)   :   Defines the server root as the real filepath of the current working directory
-#   _users_    :  (Dict)  :   Plain text dictory of user:password strings
-#   _dirTree_  :  (List)  :   Lists the files and directories of the entire server  
+#   _location_      :  (str)   :   Defines the server root as the real filepath of the current working directory
+#   _userfiles_     :  (str)   :   The path to the users directory
+#   _users_         :  (Dict)  :   Plain text dictory of user:password strings
+#   _dirTree_       :  (List)  :   Lists the files and directories of the entire server
+#   _fileDownloads_ :  (Dict)  :   Keys: filepath, Value: Number of times the file has been downloaded
 #
 #------------------------------------------------------------------------------
 _location_ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -35,23 +45,19 @@ if not os.path.isdir(_userfiles_):
     os.mkdir(_userfiles_)
 
 _users_ = os.path.join(_location_, "users.json")
-_dirTree_ = [ 
-    {
-        "dir1": [
-            {
-                "dir1Subdir1": [],
-                "dir1Subdir2": []
-            },
-            "dir1File1.txt"
-            "dir1File2.jpg"
-        ],
-        "dir2": [],
-        "dir3": []
-    },
-    "file1.txt",
-    "file2.mp3",
-    "file3.jpg"
-]
+
+filesPath = os.path.join(_location_, "files.json")
+if os.path.exists(filesPath):
+    with open(filesPath, 'r') as inFile:
+        _fileDownloads_ = json.load(inFile)
+else:
+    with open(filesPath, 'w') as outFile:
+        json.dump({}, outFile)
+    _fileDownloads_ = {}
+
+_serverFiles_ = os.path.realpath(os.path.join(_location_, ".server"))
+_downloadFiles_ = os.path.realpath(os.path.join(_serverFiles_, "Download"))
+_upFiles_ = os.path.realpath(os.path.join(_serverFiles_, "Upload"))
 
 #============================= Global Variables ===============================
 # 
@@ -62,6 +68,7 @@ _dirTree_ = [
 #
 #------------------------------------------------------------------------------
 IP = "localhost"
+#IP = "10.113.32.91"
 #IP = "10.113.32.63"
 PORT = 4450
 SIZE = 1024
@@ -208,10 +215,16 @@ class ClientThread(threading.Thread):
                     #filepath = os.path.join(os.getcwd(), "bar")
                     #filepath = os.path.join(filepath, filename)
                     filepath = os.path.join(currentDir, filename)
-                    print(" > Attempting to upload " + filename + " to " + filepath)
+                    print(" > Uploading " + filename)
 
-                    bytesReceived = 0      # Compared to the filesze to determine when transmission is complete
+                    _fileDownloads_[filepath] = 0
+                    with open(os.path.join(_location_, "files.json"), 'w') as outFile:
+                        json.dump(_fileDownloads_, outFile)
+
                     transferRows = []    # List of lists to capture the row data for generating a CSV file of data transfer rates
+                    progressBar = tqdm.tqdm(range(filesize), f" > Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
+                    bytesReceived = 0      # Compared to the filesze to determine when transmission is complete
+                    transferRows = []      # List of lists to capture the row data for generating a CSV file of data transfer rates
 
                     timeStart = time.perf_counter()
 
@@ -228,25 +241,12 @@ class ClientThread(threading.Thread):
                         bytesReceived += len(bytesRead)
                         progressBar.update(len(bytesRead))
 
-
-
-
-                    #while bytes_received < int(filesize):
-                    #    bytes_read = self.sock.recv(SIZE)                       # Read 1024 bytes from the socket (receive)
-                    #    timeStamp = round(time.perf_counter() - timeStart, 1)
-                    #    countBytesRead = len(bytes_read)                        # Write to the file the bytes we just received
-                    #    transferRows.append([timeStamp, countBytesRead])        # Add this current data transfer as a data point to data list#
-
-                    #    f.write(bytes_read)
-
-                    #    bytes_received += countBytesRead
-                    #    progressBar.update(len(bytes_read))
                     progressBar.close()
                     f.close()
 
                     send_data = "OK@File " + filename + " was transferred"
                     self.sock.send(send_data.encode(FORMAT))
-                    self.makeCSV(transferRows, "UploadServerView")
+                    self.makeGraph(transferRows, filename, True)  # True denotes uploaded file
 
                 #-----------------------------------------------------------------------------
                 #   Command:    DOWNLOAD
@@ -257,10 +257,18 @@ class ClientThread(threading.Thread):
                 elif cmd == "DOWNLOAD":
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[0] in dirsAndFiles["files"]:
+                        filepath = os.path.join(currentDir, args[0])
+                        baseFilename = os.path.basename(filename)
+                        
+                        if filepath in _fileDownloads_.keys():
+                            _fileDownloads_[filepath] += 1
+                        else:
+                            _fileDownloads_[filepath] = 1
+                        
                         bytesSent = 0
-                        fileSize = os.path.getsize(args[0])
+                        fileSize = os.path.getsize(filepath)
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
-                        with open(os.path.join(currentDir, args[0]), 'rb') as inFile:
+                        with open(filepath, 'rb') as inFile:
                             start = time.time()
                             log = []
                             while bytesSent < fileSize:
@@ -279,6 +287,9 @@ class ClientThread(threading.Thread):
                             outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
                             for i in log[1:]:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
+                        
+                        with open(os.path.join(_location_, "files.json"), 'w') as outFile:
+                            json.dump(_fileDownloads_, outFile)
 
                     else:
                         self.sock.send(f"FAIL@Could not find file: {args[0]}".encode(FORMAT))
@@ -352,9 +363,25 @@ class ClientThread(threading.Thread):
                         send_data = f"FAIL@Failed to rename {args[0]} to {args[1]}"
                     self.sock.send(send_data.encode(FORMAT))
 
-                
-                #DIR LIST (ls) TODO
-                #DIR CHANGE (cd) TODO
+                #-----------------------------------------------------------------------------
+                #   Command:    INFO
+                #   Args   :    [filename]
+                #   Purpose:    Requests info about a file: file name, size, upload date and time, number of downloads.
+                #   Status :    
+                #-----------------------------------------------------------------------------
+                elif cmd == "INFO":
+                    dirsAndFiles = self.getDirectory(currentDir)
+                    filepath = os.path.join(currentDir, args[0])
+                    if args[0] in dirsAndFiles["files"]:
+                        creationEpochTime = os.path.getctime(filepath)
+                        fileSize = os.path.getsize(filepath)
+                        numDownloads = _fileDownloads_[filepath]
+
+                        send_data = f"SUCCESS@{creationEpochTime}@{fileSize}@{numDownloads}"
+
+                    else:
+                        send_data = f"FAIL@Could not find {args[0]} in the current directory."
+                    self.sock.send(send_data.encode(FORMAT))
 
                 #TESTING
                 #TASK
@@ -371,16 +398,37 @@ class ClientThread(threading.Thread):
 
     def getDirectory(self, currentDir:str) -> dict:
         return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))],
-                "files": [x for x in os.listdir(currentDir) if os.path.isfile(os.path.join(currentDir,x))]}
+                "files": [x for x in os.listdir(currentDir) if (os.path.isfile(os.path.join(currentDir,x)) and x[0] != ".") ]}
     
-    def makeCSV(self, dataRows, filename):
-        filename += ".csv"
-        fieldHeaders = ["Microseconds", "Bytes"]
-        with open(filename, 'w', newline='') as csvfile:
+    def makeGraph(self, dataRows, filename, isUpload):
+        filename = filename.split(".")
+        filetype = filename[1]  
+        filename = filename[0]
+
+        fieldHeaders = ["Seconds", "MB/s"]
+
+        if(isUpload):
+            transferType = "Upload"
+            targetServerDir = _upFiles_
+        else:
+            transferType = "Download"
+            targetServerDir = _downloadFiles_
+
+        with open("MostRecentTransfer.csv", 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fieldHeaders)
             for row in dataRows[1:]:
                 csvwriter.writerow(row)
+
+        df = pd.read_csv("MostRecentTransfer.csv")
+        timestamp = datetime.datetime.now()
+        timestamp = timestamp.strftime("%d-%B-%Y %H-%M-%S")
+        filename = timestamp + " " + transferType + " " + filename
+        filename = os.path.realpath(os.path.join(targetServerDir, filename))
+        sns.lineplot(data=df, x="Seconds", y="MB/s", label= "Data Transfer Performance").set(title="" + transferType + " Data Transfer Performance", xlabel="Seconds", ylabel="Megabytes per Second (MB/s)")
+        plt.savefig(filename, transparent=False)
+
+
                 
 # Server Startup    
 server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)       # Using IPV4 and TCP connection
