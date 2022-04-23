@@ -251,12 +251,12 @@ class GUIWindow:
             if "SUCCESS" in data:
                 bytesReceived = 0
                 fileSize = int(data.split("@")[1])
-                start = time.time()
+                start = time.perf_counter()
 
                 while bytesReceived < fileSize:
                     
                     bytesRead = self.client.recv(self.SIZE)
-                    delta = time.time() - start
+                    delta = time.perf_counter() - start
                     
                     bps = (len(bytesRead) * 8)/delta
                     temp = {}
@@ -304,13 +304,13 @@ class GUIWindow:
             progressLabel.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             
             with open(filename, 'rb') as inFile:
-                start = time.time()
+                start = time.perf_counter()
                 log = []
                 while bytesSent < fileSize:
                     
                     bytesRead = inFile.read(self.SIZE)
                     self.client.send(bytesRead)
-                    delta = time.time() - start
+                    delta = time.perf_counter() - start
                     
                     if int(delta) % 2 == 0:
                         progress["value"] = (bytesSent/fileSize)*100
