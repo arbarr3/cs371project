@@ -10,10 +10,11 @@
 #==============================================================================
 
 from calendar import c
+from cmath import inf
 import csv
 import os
 import sys
-import time               # Used for filepath referencing
+import time             # Used for filepath referencing
 import tqdm             # Used to display file transfer progess within terminal
 import shutil           # Used for deleting directories
 import socket           # Used to implement python socket networking functionality
@@ -23,9 +24,11 @@ import json             # Used to access the user plain text file for authentica
 
 #============================= Private Variables ===============================
 # 
-#   _location_ :  (str)   :   Defines the server root as the real filepath of the current working directory
-#   _users_    :  (Dict)  :   Plain text dictory of user:password strings
-#   _dirTree_  :  (List)  :   Lists the files and directories of the entire server  
+#   _location_      :  (str)   :   Defines the server root as the real filepath of the current working directory
+#   _userfiles_     :  (str)   :   The path to the users directory
+#   _users_         :  (Dict)  :   Plain text dictory of user:password strings
+#   _dirTree_       :  (List)  :   Lists the files and directories of the entire server
+#   _fileDownloads_ :  (Dict)  :   Keys: filepath, Value: Number of times the file has been downloaded
 #
 #------------------------------------------------------------------------------
 _location_ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -35,23 +38,16 @@ if not os.path.isdir(_userfiles_):
     os.mkdir(_userfiles_)
 
 _users_ = os.path.join(_location_, "users.json")
-_dirTree_ = [ 
-    {
-        "dir1": [
-            {
-                "dir1Subdir1": [],
-                "dir1Subdir2": []
-            },
-            "dir1File1.txt"
-            "dir1File2.jpg"
-        ],
-        "dir2": [],
-        "dir3": []
-    },
-    "file1.txt",
-    "file2.mp3",
-    "file3.jpg"
-]
+
+filesPath = os.path.join(_location_, "files.json")
+if os.path.exists(filesPath):
+    with open(filesPath, 'r') as inFile:
+        _fileDownloads_ = json.load(inFile)
+else:
+    with open(filesPath, 'w') as outFile:
+        json.dump({}, outFile)
+    _fileDownloads_ = {}
+
 
 #============================= Global Variables ===============================
 # 
@@ -211,6 +207,10 @@ class ClientThread(threading.Thread):
                     filepath = os.path.join(currentDir, filename)
                     print(" > Attempting to upload " + filename)
 
+                    _fileDownloads_[filepath] = 0
+                    with open(os.path.join(_location_, "files.json"), 'w') as outFile:
+                        json.dump(_fileDownloads_, outFile)
+
                     bytes_received = 0      # Compared to the filesze to determine when transmission is complete
                     transferRows = []    # List of lists to capture the row data for generating a CSV file of data transfer rates
                     progressBar = tqdm.tqdm(range(filesize), f" > Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
@@ -241,10 +241,15 @@ class ClientThread(threading.Thread):
                 elif cmd == "DOWNLOAD":
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[0] in dirsAndFiles["files"]:
+                        filepath = os.path.join(currentDir, args[0])    
+                        if filepath in _fileDownloads_.keys():
+                            _fileDownloads_[filepath] += 1
+                        else:
+                            _fileDownloads_[filepath] = 1
                         bytesSent = 0
-                        fileSize = os.path.getsize(os.path.join(currentDir, args[0]))
+                        fileSize = os.path.getsize(filepath)
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
-                        with open(os.path.join(currentDir, args[0]), 'rb') as inFile:
+                        with open(filepath, 'rb') as inFile:
                             start = time.time()
                             log = []
                             while bytesSent < fileSize:
@@ -263,6 +268,9 @@ class ClientThread(threading.Thread):
                             outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{args[0]},{fileSize}\n")
                             for i in log[1:]:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
+                        
+                        with open(os.path.join(_location_, "files.json"), 'w') as outFile:
+                            json.dump(_fileDownloads_, outFile)
 
                     else:
                         self.sock.send(f"FAIL@Could not find file: {args[0]}".encode(FORMAT))
@@ -336,9 +344,25 @@ class ClientThread(threading.Thread):
                         send_data = f"FAIL@Failed to rename {args[0]} to {args[1]}"
                     self.sock.send(send_data.encode(FORMAT))
 
-                
-                #DIR LIST (ls) TODO
-                #DIR CHANGE (cd) TODO
+                #-----------------------------------------------------------------------------
+                #   Command:    INFO
+                #   Args   :    [filename]
+                #   Purpose:    Requests info about a file: file name, size, upload date and time, number of downloads.
+                #   Status :    
+                #-----------------------------------------------------------------------------
+                elif cmd == "INFO":
+                    dirsAndFiles = self.getDirectory(currentDir)
+                    filepath = os.path.join(currentDir, args[0])
+                    if args[0] in dirsAndFiles["files"]:
+                        creationEpochTime = os.path.getctime(filepath)
+                        fileSize = os.path.getsize(filepath)
+                        numDownloads = _fileDownloads_[filepath]
+
+                        send_data = f"SUCCESS@{creationEpochTime}@{fileSize}@{numDownloads}"
+
+                    else:
+                        send_data = f"FAIL@Could not find {args[0]} in the current directory."
+                    self.sock.send(send_data.encode(FORMAT))
 
                 #TESTING
                 #TASK
@@ -355,7 +379,7 @@ class ClientThread(threading.Thread):
 
     def getDirectory(self, currentDir:str) -> dict:
         return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))],
-                "files": [x for x in os.listdir(currentDir) if os.path.isfile(os.path.join(currentDir,x))]}
+                "files": [x for x in os.listdir(currentDir) if (os.path.isfile(os.path.join(currentDir,x)) and x[0] != ".") ]}
     
     def makeCSV(self, dataRows, filename):
         filename += ".csv"
