@@ -240,11 +240,6 @@ class GUIWindow:
                     lrow += 1
                     
 
-
-
-                
-
-        
         elif self.downloadMode:
             outFile = filedialog.asksaveasfile(initialfile=file, mode="wb")
             
@@ -313,8 +308,8 @@ class GUIWindow:
                 while bytesSent < fileSize:
                     
                     bytesRead = inFile.read(self.SIZE)
-                    self.client.send(bytesRead)
                     delta = time.perf_counter() - start
+                    self.client.send(bytesRead)
                     
                     if int(delta) % 2 == 0:
                         progress["value"] = (bytesSent/fileSize)*100
@@ -524,6 +519,8 @@ class ConnectionWindow:
         self.rootWindow.destroy()
 
 window = tk.Tk()
+style = ttk.Style(window)
+style.theme_use('clam')
 window.title("CS371 Client")
 window.withdraw()
 cW = ConnectionWindow(window)
