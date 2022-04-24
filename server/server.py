@@ -71,8 +71,6 @@ _upFiles_ = os.path.realpath(os.path.join(_location_, "uploadLogs"))
 #
 #------------------------------------------------------------------------------
 IP = "localhost"
-#IP = "10.113.32.91"
-IP = "10.113.32.63"
 PORT = 4450
 SIZE = 1024
 RETRYLIMIT = 5
