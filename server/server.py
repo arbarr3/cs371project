@@ -72,7 +72,7 @@ _upFiles_ = os.path.realpath(os.path.join(_location_, "uploadLogs"))
 #------------------------------------------------------------------------------
 IP = "localhost"
 #IP = "10.113.32.91"
-#IP = "10.113.32.63"
+IP = "10.113.32.63"
 PORT = 4450
 SIZE = 1024
 FORMAT = "utf-8"
@@ -246,7 +246,7 @@ class ClientThread(threading.Thread):
                         bps = (bytesReceived / 1000000) / delta
                         transferRows.append([delta, bps])
                         
-                        alexBPS = len(bytesReceived)/delta
+                        alexBPS = bytesReceived/delta
                         temp = {}
                         temp["bps"] = alexBPS
                         temp["time"] = delta
@@ -284,12 +284,15 @@ class ClientThread(threading.Thread):
                             _fileDownloads_[filepath] += 1
                         else:
                             _fileDownloads_[filepath] = 1
+
                         
                         bytesSent = 0
                         fileSize = os.path.getsize(filepath)
+                        progressBar = tqdm.tqdm(range(fileSize), f" > Sending {args[0]}", unit="B", unit_scale=True, unit_divisor=SIZE)
                         self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
                         with open(filepath, 'rb') as inFile:
                             start = time.perf_counter()
+                            
                             log = []
                             while bytesSent < fileSize:
                                 bytesRead = inFile.read(SIZE)
@@ -301,9 +304,11 @@ class ClientThread(threading.Thread):
                                 temp["bps"] = str(bps)
                                 temp["time"] = delta
                                 log.append(temp)
-
                                 bytesSent += len(bytesRead)
-                        with open(os.path.join(_location_,"downloadLogs",f"{file}.csv"), 'w') as outFile:
+                                progressBar.update(len(bytesRead))
+                        progressBar.close()
+
+                        with open(os.path.join(_location_,"downloadLogs",f"{args[0]}.csv"), 'w') as outFile:
                             outFile.write(f"Time,Bytes Per Second\n")
                             for i in log:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
