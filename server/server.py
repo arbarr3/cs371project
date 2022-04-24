@@ -233,23 +233,36 @@ class ClientThread(threading.Thread):
                     bytesReceived = 0      # Compared to the filesze to determine when transmission is complete
                     transferRows = []      # List of lists to capture the row data for generating a CSV file of data transfer rates
 
-                    timeStart = time.perf_counter()
-
                     progressBar = tqdm.tqdm(range(filesize), f" > Sending {filename}", unit="B", unit_scale=True, unit_divisor=SIZE)
                     
+                    log = []
+                    timeStart = time.perf_counter()
                     f = open(filepath, "wb")
 
                     while bytesReceived < int(filesize):
                         bytesRead = self.sock.recv(SIZE)  
                         delta = time.perf_counter() - timeStart
+
                         bps = (bytesReceived / 1000000) / delta
                         transferRows.append([delta, bps])
+                        
+                        alexBPS = len(bytesReceived)/delta
+                        temp = {}
+                        temp["bps"] = alexBPS
+                        temp["time"] = delta
+                        log.append(temp)
+
                         f.write(bytesRead)
                         bytesReceived += len(bytesRead)
                         progressBar.update(len(bytesRead))
 
                     progressBar.close()
                     f.close()
+
+                    with open(os.path.join(_location_,"uploadLogs",f"{filename}.csv"), 'w') as outFile:
+                        outFile.write(f"Time,Bytes Per Second\n")
+                        for i in log:
+                            outFile.write(f"{i['time']},{i['bps']}\n")
 
                     send_data = "OK@File " + filename + " was transferred"
                     self.sock.send(send_data.encode(FORMAT))
@@ -290,9 +303,9 @@ class ClientThread(threading.Thread):
                                 log.append(temp)
 
                                 bytesSent += len(bytesRead)
-                        with open(os.path.join(_location_,"serverDownloadLog.csv"), 'a') as outFile:
-                            outFile.write(f"Time,Bits Per Second,Filename,Filesize\n{log[0]['time']},{log[0]['bps']},{baseFilename},{fileSize}\n")
-                            for i in log[1:]:
+                        with open(os.path.join(_location_,"downloadLogs",f"{file}.csv"), 'w') as outFile:
+                            outFile.write(f"Time,Bytes Per Second\n")
+                            for i in log:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
                         
                         with open(os.path.join(_location_, "files.json"), 'w') as outFile:
