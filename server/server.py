@@ -75,6 +75,7 @@ IP = "localhost"
 #IP = "10.113.32.63"
 PORT = 4450
 SIZE = 1024
+RETRYLIMIT = 5
 FORMAT = "utf-8"
 LOCK = threading.Lock()
 
@@ -95,9 +96,10 @@ class ClientThread(threading.Thread):
     # Exit:     Terminates server connection to client by closing the socket
     #--------------------------------------------------------------------------
     def run(self):
+        verbose = True                          # Display communication in the terminal
         userConnected = True                    # Maintains functionality of the running thread, when set to false connection is terminating and socket closes
         userAuth = False                        # Prevents execution of main while loop in this run method until user credentials are authenticated
-        self.sock.send("LOGIN@".encode(FORMAT)) # Prompt the client for login credentials upon connection
+        self.sendIt("LOGIN",[],verbose=verbose, verboseText=" > Requesting login credentials.") # Prompt the client for login credentials upon connection
 
         #===================================== LOGIN Logic ===================================================
         #-----------------------------------------------------------------------------------------------------
@@ -118,22 +120,25 @@ class ClientThread(threading.Thread):
             credentials = self.sock.recv(SIZE).decode(FORMAT)   # In response to LOGIN@ request, client transmits credentials to authenticate
             user, password = credentials.split("@")             # Split credentials from "username@password" into seperate (str) variables
 
+            if verbose:
+                print(f" > {user} has requested to log in.")
+
             # Iterate through the _users_ dict to determine if supplies credentials match a user:password pair
             for key, value in _users_.items():
                 if key == user and value == password:
                     userAuth = True                                             # Enables entry into main while loop of run method for ClientHandler
-                    self.sock.send("ACCEPT".encode(FORMAT))                     # Send a response to the client to vaidate client-side authentication was successful                    
+                    self.sendIt("ACCEPT",[],verbose=verbose, verboseText=f" > Accepting {user}'s credentials.") # Send a response to the client to vaidate client-side authentication was successful
                     currentDir = os.path.join(_userfiles_, user)                # Setting the current directory to the user's directory
                     if not os.path.isdir(currentDir):                           # If the user doesn't have a directory yet...
                         os.mkdir(currentDir)                                    # make one
 
-                    print(" > " + user + " has successfully logged in")
+                    print(" > " + user + " has successfully logged in.")
                     break                                       
 
             # If credential pair was not found in _users_ dict, a response needs to be sent to client
             # Because userAuth is false, the main while loop will not be entered and server will wait for new credentials
             if(not userAuth):
-                self.sock.send("REJECT@Invalid username or password.".encode(FORMAT))   # Sending anything other than ACCEPT will cause client to loop back into resending credentials
+                self.sendIt("REJECT",["Invalid username or password."], verbose=verbose, verboseText=f" > {user} failed login attempt.") # Sending anything other than ACCEPT will cause client to loop back into resending credentials
                 print(" > " + user + " failed login attempt.")  
 
             # Once user credentials are authenticated, the server begins to accept client requests
@@ -155,6 +160,9 @@ class ClientThread(threading.Thread):
                 args = []                       # Used withing flow control blocks to perform command
                 for i in range (1, len(data)):  # Capture all sent arguments
                     args.append(data[i])        # Populate list with command's arguments
+                
+                if verbose:
+                    print(f" > User {user} requested: {cmd} with arguments: {args}")
 
                 #-----------------------------------------------------------------------------
                 #   Command:    GETDIR
@@ -167,8 +175,9 @@ class ClientThread(threading.Thread):
                     dirContent = self.getDirectory(currentDir)
                     if currentDir != os.path.join(_userfiles_, user) and currentDir != _sharedfiles_:
                         dirContent["dirs"].insert(0,"..")
-                    print(f"sending: {dirContent}")
                     send_data = pickle.dumps(dirContent)
+                    if verbose:
+                        print(f" > Sending directory structure for: {currentDir}.")
                     self.sock.send(send_data)
                 
                 #-----------------------------------------------------------------------------
@@ -182,24 +191,24 @@ class ClientThread(threading.Thread):
                     navigableDirs = [x for x in os.listdir(currentDir) if not os.path.isfile(x)]                # Get a list of directorys in the current directory
                     if args[0] == "..":                                                                         # If the user wants to navigate up
                         if currentDir == os.path.join(_userfiles_, user):                                       # if we're already in the user's top directory
-                            self.sock.send("FAIL@Already at root, cannot navigate higher.".encode(FORMAT))      # Tell them to knock that l337 h4X0r shit off
+                            self.sendIt("FAIL",["Already at root, cannot navigate higher."], verbose=verbose, verboseText=f" > {user} (somehow) attempted to escape their home directory.  This shouldn't be possible.")
                         else:
                             currentDir = os.path.abspath(os.path.join(currentDir, os.pardir))
                             dirContent = self.getDirectory(currentDir)
                             if currentDir != os.path.join(_userfiles_, user):
                                 dirContent["dirs"].insert(0,"..")
-                            self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                            self.sendIt("SUCCESS",[currentDir],verbose=verbose, verboseText=f" > {user} navigated to {currentDir}.")
                     elif args[0] == "home":
                         currentDir = os.path.join(_userfiles_, user)
-                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                        self.sendIt("SUCCESS",[currentDir],verbose=verbose, verboseText=f" > {user} navigated to {currentDir}.")
                     elif args[0] == "shared":
                         currentDir = _sharedfiles_
-                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                        self.sendIt("SUCCESS",[currentDir],verbose=verbose, verboseText=f" > {user} navigated to {currentDir}.")
                     elif args[0] in navigableDirs:
                         currentDir = os.path.join(currentDir, args[0])
-                        self.sock.send(f"SUCCESS@{currentDir}".encode(FORMAT))
+                        self.sendIt("SUCCESS",[currentDir],verbose=verbose, verboseText=f" > {user} navigated to {currentDir}.")
                     else:
-                        self.sock.send("FAIL@Attempted to navigate to unknown directory.".encode(FORMAT))
+                        self.sendIt("FAIL", ["Attempted to navigate to an unknown directory."], verbose=verbose, verboseText=f" > {user} attempted to navigate to an unknown directory: {args[0]}.")
 
                 #-----------------------------------------------------------------------------
                 #   Command:    LOGOUT
@@ -220,10 +229,8 @@ class ClientThread(threading.Thread):
                 elif cmd == "UPLOAD":
                     filesize = int(args.pop())
                     filename = args.pop()
-
-                    #filepath = os.path.join(os.getcwd(), "bar")
-                    #filepath = os.path.join(filepath, filename)
                     filepath = os.path.join(currentDir, filename)
+                    
                     print(" > Uploading " + filename)
 
                     _fileDownloads_[filepath] = 0
@@ -246,7 +253,7 @@ class ClientThread(threading.Thread):
                         bps = (bytesReceived / 1000000) / delta
                         transferRows.append([delta, bps])
                         
-                        alexBPS = len(bytesReceived)/delta
+                        alexBPS = bytesReceived/delta
                         temp = {}
                         temp["bps"] = alexBPS
                         temp["time"] = delta
@@ -263,9 +270,12 @@ class ClientThread(threading.Thread):
                         outFile.write(f"Time,Bytes Per Second\n")
                         for i in log:
                             outFile.write(f"{i['time']},{i['bps']}\n")
+                    
+                    if os.path.getsize(filepath) == filesize:
+                        self.sendIt("SUCCESS", [f"File {filename} was transferred."], verbose=verbose, verboseText=f" > {filename} was successfully saved in {filepath}.")
+                    else:
+                        self.sendIt("FAIL",[f"File {filename} was not received in its entirety."], verbose=verbose, verboseText=f" > Upload failed, only received {bytesReceived} bytes of {filesize}.")
 
-                    send_data = "OK@File " + filename + " was transferred"
-                    self.sock.send(send_data.encode(FORMAT))
                     #self.makeGraph(transferRows, filename, True)  # True denotes uploaded file
 
                 #-----------------------------------------------------------------------------
@@ -287,7 +297,7 @@ class ClientThread(threading.Thread):
                         
                         bytesSent = 0
                         fileSize = os.path.getsize(filepath)
-                        self.sock.send(f"SUCCESS@{fileSize}".encode(FORMAT))
+                        self.sendIt("SUCCESS", [fileSize], verbose=verbose, verboseText=f" > Sending {user} file: {baseFilename}.")
                         with open(filepath, 'rb') as inFile:
                             start = time.perf_counter()
                             log = []
@@ -303,7 +313,7 @@ class ClientThread(threading.Thread):
                                 log.append(temp)
 
                                 bytesSent += len(bytesRead)
-                        with open(os.path.join(_location_,"downloadLogs",f"{file}.csv"), 'w') as outFile:
+                        with open(os.path.join(_location_,"downloadLogs",f"{baseFilename}.csv"), 'w') as outFile:
                             outFile.write(f"Time,Bytes Per Second\n")
                             for i in log:
                                 outFile.write(f"{i['time']},{i['bps']}\n")
@@ -312,20 +322,7 @@ class ClientThread(threading.Thread):
                             json.dump(_fileDownloads_, outFile)
 
                     else:
-                        self.sock.send(f"FAIL@Could not find file: {args[0]}".encode(FORMAT))
-                #-----------------------------------------------------------------------------
-                #   Command:    DELFILE
-                #   Args   :    [filename]
-                #   Purpose:    Delete the file specified at the current location, provided the file exists
-                #   Status :    33% TODO Needs validation / Edge case considerations for missing files
-                #               TODO Needs to use socket's current working directory, not _location_
-                #-----------------------------------------------------------------------------
-                elif cmd == "DELFILE":
-                    filename = args.pop()
-                    if os.path.exists(_location_):
-                        os.remove(filename)
-                        print(" > File " + filename + " has been deleted.")
-                        self.sock.send("OK@File has been deleted".encode(FORMAT))
+                        self.sendIt("FAIL",[f"Could not find file: {baseFilename}"], verbose=verbose, verboseText=f" > {user} requested a file {baseFilename} that doesn't exist in {currentDir}.")
                 
                 #-----------------------------------------------------------------------------
                 #   Command:    DELETE
@@ -334,23 +331,15 @@ class ClientThread(threading.Thread):
                 #   Status :    50% TODO Needs to evaluate based on socket's current working directory, not _location_
                 #-----------------------------------------------------------------------------
                 elif cmd == "DELETE":
-                    # dir = args.pop()
-                    # dirPath = os.path.join(_location_, dir)
-                    # if os.path.exists(dirPath):
-                    #     shutil.rmtree(dir)
-                    #     print(" > Directory " + dir + " has been deleted.")
-                    #     self.sock.send("OK@Directory has been deleted".encode(FORMAT))
                     toDelete = os.path.join(currentDir, args[0])
                     if os.path.exists(toDelete):
                         if not os.path.isfile(toDelete):
                             shutil.rmtree(toDelete)
                         else:
                             os.remove(toDelete)
-                        send_data = f"SUCCESS@{args[0]} has been deleted."
+                        self.sendIt("SUCCESS",[f"{args[0]} has been deleted."], verbose=verbose, verboseText=f" > Deleted {args[0]} in {currentDir}.")
                     else:
-                        send_data = f"FAIL@Could not find {toDelete}."
-                    self.sock.send(send_data.encode(FORMAT))
-
+                        self.sendIt("FAIL",[f"Could not find {toDelete}."], verbose=verbose, verboseText=f" > Could not find {args[0]} in {currentDir}.")
 
                 #-----------------------------------------------------------------------------
                 #   Command:    MKDIR
@@ -363,10 +352,9 @@ class ClientThread(threading.Thread):
                     dirContent = self.getDirectory(currentDir)
                     if newDir not in dirContent["dirs"]:
                         os.mkdir(os.path.join(currentDir,newDir))
-                        send_data = f"SUCCESS@New Directory {newDir} was created."
+                        self.sendIt("SUCCESS",[f"New Directory {newDir} was created."], verbose=verbose, verboseText=f" > Created {newDir} under {currentDir}.")
                     else:
-                        send_data = f"FAIL@The directory {newDir} aleady exists."
-                    self.sock.send(send_data.encode(FORMAT))
+                        self.sendIt("FAIL", [f"The directory {newDir} aleady exists."], verbose=verbose, verboseText=f" > {newDir} already exists in {currentDir}.")
                 
                 #-----------------------------------------------------------------------------
                 #   Command:    RENAME
@@ -378,10 +366,9 @@ class ClientThread(threading.Thread):
                     os.rename(os.path.join(currentDir, args[0]), os.path.join(currentDir, args[1]))
                     dirsAndFiles = self.getDirectory(currentDir)
                     if args[1] in dirsAndFiles["files"] or args[1] in dirsAndFiles["dirs"]:
-                        send_data = f"SUCCESS@Renamed {args[0]} to {args[1]}"
+                        self.sendIt("SUCCESS",[f"Renamed {args[0]} to {args[1]}"], verbose=verbose, verboseText=f" > Renamed {args[0]} to {args[1]}")
                     else:
-                        send_data = f"FAIL@Failed to rename {args[0]} to {args[1]}"
-                    self.sock.send(send_data.encode(FORMAT))
+                        self.sendIt("FAIL", [f"Failed to rename {args[0]} to {args[1]}"], verbose=verbose, verboseText=f" > Failed to rename {args[0]} to {args[1]}")
 
                 #-----------------------------------------------------------------------------
                 #   Command:    INFO
@@ -396,30 +383,38 @@ class ClientThread(threading.Thread):
                         creationEpochTime = os.path.getctime(filepath)
                         fileSize = os.path.getsize(filepath)
                         numDownloads = _fileDownloads_[filepath]
-
-                        send_data = f"SUCCESS@{creationEpochTime}@{fileSize}@{numDownloads}"
-
+                        self.sendIt("SUCCESS", [creationEpochTime, fileSize, numDownloads], verbose=verbose, verboseText=f" > Sending info for {args[0]} in {currentDir}.")
                     else:
-                        send_data = f"FAIL@Could not find {args[0]} in the current directory."
-                    self.sock.send(send_data.encode(FORMAT))
+                        self.sendIt("FAIL", [f"Could not find {args[0]} in the current directory."], verbose=verbose, verboseText=f" > {args[0]} does not exist in {currentDir}")
 
                 #TESTING
                 #TASK
                 elif cmd == "TASK":
-                    send_data = "OK@"
-                    send_data += "CREATE new file on the server.\n" 
-                    send_data += "LOGOUT from the server."
-                    self.sock.send(send_data.encode(FORMAT))
+                    self.sendIt("OK",["CREATE new file on the server.\nLOGOUT from the server."])
 
         # Executes once userConnected is false
         # Close the socket and end the running loop 
         self.sock.close()
-        print(" > Terminating connection thead on " + self.ip + ":" + str(self.port))
+        print(f" > Closing connection thead with {user} at {self.ip} on port {self.port}")
 
     def getDirectory(self, currentDir:str) -> dict:
         return {"dirs": [x for x in os.listdir(currentDir) if not os.path.isfile(os.path.join(currentDir,x))],
                 "files": [x for x in os.listdir(currentDir) if (os.path.isfile(os.path.join(currentDir,x)) and x[0] != ".") ]}
     
+    def sendIt(self, command:str, args:list, seperator="@", verbose=False, verboseText="", attempts=0):
+        try:
+            if verbose:
+                print(verboseText)
+            message = command+seperator.join(args)
+            self.sock.send(message.encode(FORMAT))
+        except:
+            if attempts < RETRYLIMIT:
+                self.sendIt(command, args, seperator=seperator, verbose=verbose, verboseText=verboseText, attempts=attempts+1)
+            else:
+                print(f"Error: Reached maximum number of transmit attempts: {RETRYLIMIT}.  Closing connection.")
+                self.sock.close()
+
+
     def makeGraph(self, dataRows, filename, isUpload):
         filename = filename.split(".")
         filetype = filename[1]  

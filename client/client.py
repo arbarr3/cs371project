@@ -1,10 +1,17 @@
-import sys, os
+#==============================================================================
+#
+#   Authors:    Alexander Barrera & Robert Crispen
+#   Date:       24 April 2022
+#   Org:        University of Kentucky
+#   Class:      CS371 - Computer Networking
+#
+#   Purpose:    This program is a basic UI client for connecting to a socket
+#               server.
+#               
+#==============================================================================
+import sys, os, socket, pickle, time
 import tkinter as tk
-from tkinter import SUNKEN, ttk, filedialog
-from tkinter import StringVar
-import socket
-import pickle
-import time
+from tkinter import SUNKEN, ttk, filedialog, StringVar
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -261,7 +268,7 @@ class GUIWindow:
                     ax.set_ylabel("Transfer Rate (bytes/second)")
                     chartType = FigureCanvasTkAgg(figure, master=popup)
                     chartType.draw()
-                    chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=2)
+                    chartType.get_tk_widget().grid(row=lrow, column=lcol, columnspan=5)
                     lrow += 1
 
         elif self.downloadButton.toggled:
@@ -301,7 +308,7 @@ class GUIWindow:
                             progress["value"] = (bytesReceived/fileSize)*100
                             self.window.update()
                         
-                        bps = len(bytesRead)/delta
+                        bps = bytesReceived/delta
                         temp = {}
                         temp["bps"] = bps
                         temp["time"] = delta
@@ -336,7 +343,7 @@ class GUIWindow:
             self.client.send(f"UPLOAD@{baseFilename}@{fileSize}".encode(self.FORMAT))
             bytesSent = 0
 
-            fileFrame = tk.Frame(self.dirsAndFilesFrame, height=90, width=90)
+            fileFrame = tk.Frame(self.dirsAndFilesFrame, height=90, width=90, highlightbackground="blue", highlightthickness=2)
             fileFrame.grid(row=self.dirsAndFilesRow, column=self.dirsAndFilesCol, padx=5, sticky="nw")
             self.dirsAndFilesRow += 1
 
@@ -359,7 +366,7 @@ class GUIWindow:
                     self.client.send(bytesRead)
                     
                     if int(delta) % 2 == 0:
-                        progress["value"] = (int(bytesSent/fileSize)*100)
+                        progress["value"] = (int(bytesSent)/fileSize)*100
                         self.window.update()
 
                     bps = int(bytesSent/delta)
@@ -380,10 +387,12 @@ class GUIWindow:
                 for i in log:
                     outFile.write(f"{i['time']},{i['bps']}\n")
             
-            if "OK" in data:
+            if "SUCCESS" in data:
                 fileFrame.destroy()
                 progressLabel.destroy()
                 self.updateDirectory()
+            else:
+                print("File failed to upload correcly.")
 
     def stringifyFileSize(self, value, units:str):
         if value // 2**20 > 0:
@@ -559,7 +568,7 @@ class ConnectionWindow:
         self.client.connect((self.ip, int(self.port)))
         while loggingIn:
             data = self.client.recv(self.SIZE).decode(self.FORMAT)
-            if "LOGIN@" in data:
+            if "LOGIN" in data:
                 sending = self.userNameEntry.get()+"@"+self.passwordEntry.get()
                 self.client.send(sending.encode(self.FORMAT))
             elif "ACCEPT" in data:
