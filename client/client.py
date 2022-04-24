@@ -75,6 +75,9 @@ class GUIWindow:
         self.window.geometry(self.STDGEO)
         self.window.protocol("WM_DELETE_WINDOW", self.dieGracefully)
         self.window.bind("<Return>", lambda e: self.window.focus_force())
+        self.windowText = "CS371 Client\tPath: "
+        self.path = ["~"]
+        self.window.title(self.windowText + f" {'/'.join(self.path)}/")
         self.client = clientSocket
         self.homeFolderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "home.png"))
         self.sharedFolderImage = tk.PhotoImage(file=os.path.join(self.cwd,"images", "sharedFolder.png"))
@@ -145,12 +148,16 @@ class GUIWindow:
         self.client.send(f"CHANGEDIR@home".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
+            self.path = ["~"]
+            self.window.title(self.windowText + f" {'/'.join(self.path)}/")
             self.updateDirectory()
     
     def goShared(self):
         self.client.send(f"CHANGEDIR@shared".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
+            self.path = ["shared"]
+            self.window.title(self.windowText + f" {'/'.join(self.path)}/")
             self.updateDirectory()
 
     def toggleDownloadFile(self):
@@ -482,6 +489,12 @@ class GUIWindow:
             self.client.send(f"CHANGEDIR@{dir}".encode(self.FORMAT))
         data = self.client.recv(self.SIZE).decode(self.FORMAT)
         if "SUCCESS" in data:
+            if not self.deleteButton.toggled:
+                if dir == "..":
+                    self.path.pop()
+                else:
+                    self.path.append(dir)
+                self.window.title(self.windowText + f" {'/'.join(self.path)}/")
             self.updateDirectory()
 
 
