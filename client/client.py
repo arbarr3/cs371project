@@ -1,4 +1,4 @@
-import os
+import sys, os
 import tkinter as tk
 from tkinter import SUNKEN, ttk, filedialog
 from tkinter import StringVar
@@ -268,16 +268,31 @@ class GUIWindow:
                     bytesReceived = 0
                     fileSize = int(data.split("@")[1])
                     
-                    downloadsFrame = tk.Frame(self.window, height=46, width=self.window.winfo_width())
-                    downloadsFrame.grid(row=self.gridRow, column=self.gridColumn, sticky="s")
-                    downloadsFrame.config(bg="red")
+                    thisFilesInfo = self.fileButtons[file].grid_info()
+                    downloadFrame = tk.Frame(self.dirsAndFilesFrame, height=110, width=90, highlightbackground="green", highlightthickness=2)
+                    downloadFrame.grid(row=thisFilesInfo['row'], column=thisFilesInfo['column'], padx=5, pady=5, sticky="nsew")
 
+                    downloadFrame.grid_rowconfigure(0, weight=2)
+                    downloadFrame.grid_rowconfigure(1, weight=1)
+                    downloadFrame.grid_columnconfigure(0, weight=1)
+
+                    speedVal = tk.StringVar(value="Uploading\nat\n0 Bps")
+                    uploadSpeed = tk.Label(downloadFrame, textvariable=speedVal)                    
+                    uploadSpeed.grid(row=0, column=0, sticky="nsew")
+                    progress = ttk.Progressbar(downloadFrame, length=89)
+                    progress.grid(row=1, column=0, sticky="nsew")
+
+                    self.window.update()
 
                     start = time.perf_counter()
                     while bytesReceived < fileSize:
                         
                         bytesRead = self.client.recv(self.SIZE)
                         delta = time.perf_counter() - start
+
+                        if int(delta) % 2 == 0:
+                            progress["value"] = (bytesReceived/fileSize)*100
+                            self.window.update()
                         
                         bps = len(bytesRead)/delta
                         temp = {}
@@ -285,8 +300,12 @@ class GUIWindow:
                         temp["time"] = delta
                         log.append(temp)
 
+                        displayBPS = self.stringifyFileSize(int(bps), "Bps")
+                        speedVal.set(value=f"Downloading\nat\n{displayBPS}")
+
                         outFile.write(bytesRead)
                         bytesReceived += len(bytesRead)
+                    self.updateDirectory()
 
                 else:
                     print(data) # TODO Notify the user that this failed and why
@@ -333,7 +352,7 @@ class GUIWindow:
                     self.client.send(bytesRead)
                     
                     if int(delta) % 2 == 0:
-                        progress["value"] = (bytesSent/fileSize)*100
+                        progress["value"] = (int(bytesSent/fileSize)*100)
                         self.window.update()
 
                     bps = int(bytesSent/delta)
@@ -419,6 +438,7 @@ class GUIWindow:
             if self.dirsAndFilesCol > 5:
                 self.dirsAndFilesCol = 0
                 self.dirsAndFilesRow += 2
+        self.window.update()
 
     def changeFilename(self, e, file):
         self.fileLabels[file].configure(state=tk.NORMAL)
@@ -470,7 +490,15 @@ class ConnectionWindow:
     FORMAT = 'utf-8'
     xpad = 5
     
-    def __init__(self, rootWindow):
+    def __init__(
+        self,
+        rootWindow,
+        ip = "",
+        port = "",
+        username = "",
+        password = "",
+        ):
+
         self.client = None
         self.rootWindow = rootWindow
         self.window = tk.Toplevel(rootWindow)
@@ -502,6 +530,14 @@ class ConnectionWindow:
         connectButton.bind("<Button-1>", self.connect)
         self.window.bind("<Return>", self.connect)
 
+        if ip+port+username+password != "":
+            self.ipEntry.insert(0,ip)
+            self.portEntry.insert(0,port)
+            self.userNameEntry.insert(0,username)
+            self.passwordEntry.insert(0,password)
+            self.connect(None)
+
+
     def connect(self, event):
         loggingIn = True
         self.ip = self.ipEntry.get()
@@ -532,9 +568,14 @@ class ConnectionWindow:
             print("Warning: Problem closing the connection.")
         self.rootWindow.destroy()
 
-window = tk.Tk()
-window.tk_setPalette(background="white")
-window.title("CS371 Client")
-window.withdraw()
-cW = ConnectionWindow(window)
-window.mainloop()
+if __name__ == '__main__':
+    window = tk.Tk()
+    window.tk_setPalette(background="white")
+    window.title("CS371 Client")
+    window.withdraw()
+    if len(sys.argv) == 5:
+        cw = ConnectionWindow(window, ip=sys.argv[1], port=sys.argv[2], username=sys.argv[3], password=sys.argv[4])
+    else:
+        cW = ConnectionWindow(window)
+
+    window.mainloop()
