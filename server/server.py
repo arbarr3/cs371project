@@ -408,10 +408,11 @@ class ClientThread(threading.Thread):
         try:
             if verbose:
                 print(verboseText)
-            message = command+seperator.join(args)
+            message = command+seperator+seperator.join([str(x) for x in args])
             self.sock.send(message.encode(FORMAT))
-        except:
+        except Exception as e:
             if attempts < RETRYLIMIT:
+                print(f"Error: Exception ({e}), retrying {attempts}/{RETRYLIMIT}...")
                 self.sendIt(command, args, seperator=seperator, verbose=verbose, verboseText=verboseText, attempts=attempts+1)
             else:
                 print(f"Error: Reached maximum number of transmit attempts: {RETRYLIMIT}.  Closing connection.")
